@@ -57,7 +57,13 @@ Recommended setup:
    ```text
    EXPO_PUBLIC_SUPABASE_URL
    EXPO_PUBLIC_SUPABASE_ANON_KEY
+   EXPO_PUBLIC_DEMO_EMAIL
+   EXPO_PUBLIC_DEMO_PASSWORD
    ```
+
+   The demo secrets are optional. If both are present, the sign-in screen shows
+   a demo login button. Use a real Supabase user for this demo account, not a
+   service-role or secret key.
 
 2. In GitHub Pages settings, use GitHub Actions as the publishing source.
 

@@ -8,6 +8,9 @@ import { colors, spacing, typography } from '@/constants/tokens';
 import { useAuthSession } from '@/contexts/auth-session';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const demoEmail = process.env.EXPO_PUBLIC_DEMO_EMAIL;
+const demoPassword = process.env.EXPO_PUBLIC_DEMO_PASSWORD;
+const isDemoLoginConfigured = Boolean(demoEmail && demoPassword);
 
 type Mode = 'signIn' | 'signUp' | 'forgotPassword';
 
@@ -82,6 +85,27 @@ export default function AuthScreen() {
     setIsSubmitting(false);
   }
 
+  async function handleDemoLogin() {
+    if (!demoEmail || !demoPassword) {
+      setMessage('Demo login is not configured yet.');
+      return;
+    }
+
+    setMode('signIn');
+    setEmail(demoEmail);
+    setPassword('');
+    setIsSubmitting(true);
+    setMessage(null);
+
+    const result = await signIn(demoEmail, demoPassword);
+
+    if (result.error) {
+      setMessage(result.error);
+    }
+
+    setIsSubmitting(false);
+  }
+
   const titles: Record<Mode, string> = {
     signIn: 'Welcome back',
     signUp: 'Create your account',
@@ -136,6 +160,15 @@ export default function AuthScreen() {
         ) : null}
 
         <Button loading={isSubmitting} label={ctaLabels[mode]} onPress={handleSubmit} />
+
+        {mode === 'signIn' && isDemoLoginConfigured ? (
+          <Button
+            disabled={isSubmitting}
+            label="Try demo account"
+            onPress={handleDemoLogin}
+            variant="secondary"
+          />
+        ) : null}
 
         {mode === 'forgotPassword' ? (
           <Button label="Back to Sign In" onPress={() => switchMode('signIn')} variant="secondary" />
