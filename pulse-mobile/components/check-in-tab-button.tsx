@@ -33,8 +33,8 @@ const styles = StyleSheet.create({
   wrapper: {
     alignItems: 'center',
     justifyContent: 'center',
-    height: 62,
-    top: -10,
+    height: 66,
+    top: -6,
   },
   button: {
     alignItems: 'center',
@@ -42,9 +42,9 @@ const styles = StyleSheet.create({
     borderColor: colors.ink,
     borderRadius: 999,
     borderWidth: 4,
-    height: 58,
+    height: 56,
     justifyContent: 'center',
-    width: 58,
+    width: 56,
     ...shadows.floating(colors.primary.text),
   },
 });

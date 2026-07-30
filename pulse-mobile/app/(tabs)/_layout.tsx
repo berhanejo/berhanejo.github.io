@@ -18,10 +18,10 @@ const tabBarLabelStyle = {
 } as const;
 
 const tabBarItemStyle = {
-  height: 56,
+  height: 66,
   justifyContent: 'center',
-  paddingBottom: 4,
-  paddingTop: 6,
+  paddingBottom: 8,
+  paddingTop: 8,
 } as const;
 
 function HomeIcon({ color, size }: { color: string; size: number }) {
@@ -44,8 +44,13 @@ export default function TabLayout() {
   const { session, isLoading, isPasswordRecovery } = useAuthSession();
   const { data: profile, isLoading: isProfileLoading } = useProfile();
   const insets = useSafeAreaInsets();
-  const bottomInset = Platform.OS === 'web' ? 18 : Platform.OS === 'android' ? Math.max(insets.bottom, 14) : Math.max(insets.bottom, 8);
-  const tabBarHeight = 78 + bottomInset;
+  const bottomInset =
+    Platform.OS === 'web'
+      ? Math.max(insets.bottom, 42)
+      : Platform.OS === 'android'
+        ? Math.max(insets.bottom, 18)
+        : Math.max(insets.bottom, 12);
+  const tabBarHeight = 86 + bottomInset;
   const screenOptions = useMemo(
     () => ({
       tabBarActiveTintColor: colors.primary.light,
@@ -58,8 +63,8 @@ export default function TabLayout() {
         bottom: 0,
         elevation: 12,
         height: tabBarHeight,
-        paddingBottom: bottomInset + 6,
-        paddingTop: 10,
+        paddingBottom: bottomInset,
+        paddingTop: 12,
         backgroundColor: colors.ink,
         borderTopColor: 'rgba(255, 255, 255, 0.08)',
         borderTopWidth: 1,
