@@ -209,10 +209,10 @@ const styles = StyleSheet.create({
   },
   tabBar: {
     alignItems: 'center',
-    backgroundColor: 'rgba(15, 23, 42, 0.96)',
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
+    backgroundColor: colors.ink,
+    borderColor: colors.slate[700],
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
     borderWidth: 1,
     borderBottomWidth: 0,
     elevation: 8,
@@ -226,8 +226,8 @@ const styles = StyleSheet.create({
     right: 0,
     shadowColor: colors.ink,
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.16,
-    shadowRadius: 14,
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
     width: '100%',
   },
   tabBarNativeHeight: {
@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   tabButtonActive: {
-    backgroundColor: 'rgba(134, 239, 172, 0.18)',
+    backgroundColor: colors.slate[700],
   },
   tabButtonLabel: {
     color: colors.slate[300],
