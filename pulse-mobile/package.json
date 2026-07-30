@@ -7,7 +7,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "export:web": "expo export --platform web --output-dir dist && touch dist/.nojekyll",
+    "export:web": "expo export --platform web --output-dir dist && node scripts/post-export-web.js",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
     "test": "node scripts/smoke-tests.js"

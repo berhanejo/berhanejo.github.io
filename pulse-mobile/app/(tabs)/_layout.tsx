@@ -1,81 +1,108 @@
+import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Redirect, Tabs } from 'expo-router';
-import React, { useMemo } from 'react';
+import React from 'react';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { CheckInTabButton } from '@/components/check-in-tab-button';
-import { HapticTab } from '@/components/haptic-tab';
-import { colors, shadows } from '@/constants/tokens';
+import { colors } from '@/constants/tokens';
 import { useAuthSession } from '@/contexts/auth-session';
 import { useProfile } from '@/lib/queries/profile';
 
-const tabBarLabelStyle = {
-  fontSize: 11,
-  fontWeight: '800',
-  marginTop: 2,
-  paddingBottom: 0,
-} as const;
-
-const tabBarItemStyle = {
-  height: 66,
-  justifyContent: 'center',
-  paddingBottom: 8,
-  paddingTop: 8,
-} as const;
-
-function HomeIcon({ color, size }: { color: string; size: number }) {
-  return <MaterialIcons name="home-filled" size={size} color={color} />;
+function HomeIcon({ color }: { color: string }) {
+  return <MaterialIcons name="home-filled" size={18} color={color} />;
 }
 
-function GroupIcon({ color, size }: { color: string; size: number }) {
-  return <MaterialIcons name="groups" size={size} color={color} />;
+function GroupIcon({ color }: { color: string }) {
+  return <MaterialIcons name="groups" size={18} color={color} />;
 }
 
-function ProgressIcon({ color, size }: { color: string; size: number }) {
-  return <MaterialIcons name="show-chart" size={size} color={color} />;
+function CheckInIcon({ color }: { color: string }) {
+  return <MaterialIcons name="add" size={19} color={color} />;
 }
 
-function ProfileIcon({ color, size }: { color: string; size: number }) {
-  return <MaterialIcons name="person" size={size} color={color} />;
+function ProgressIcon({ color }: { color: string }) {
+  return <MaterialIcons name="show-chart" size={18} color={color} />;
+}
+
+function ProfileIcon({ color }: { color: string }) {
+  return <MaterialIcons name="person" size={18} color={color} />;
+}
+
+function getTabIcon(routeName: string, color: string) {
+  switch (routeName) {
+    case 'index':
+      return <HomeIcon color={color} />;
+    case 'group':
+      return <GroupIcon color={color} />;
+    case 'check-in':
+      return <CheckInIcon color={color} />;
+    case 'progress':
+      return <ProgressIcon color={color} />;
+    case 'profile':
+      return <ProfileIcon color={color} />;
+    default:
+      return null;
+  }
+}
+
+function PulseTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+  const insets = useSafeAreaInsets();
+  const bottomInset =
+    Platform.OS === 'web'
+      ? 4
+      : Platform.OS === 'android'
+        ? Math.min(Math.max(insets.bottom, 4), 10)
+        : Math.min(Math.max(insets.bottom, 4), 12);
+
+  return (
+    <View style={[styles.tabBarWrap, { height: 34 + bottomInset, paddingBottom: bottomInset }]}>
+      <View style={styles.tabBar}>
+        {state.routes.map((route, index) => {
+          if (route.name === 'goals') {
+            return null;
+          }
+
+          const { options } = descriptors[route.key];
+          const isFocused = state.index === index;
+          const color = isFocused ? colors.ink : colors.slate[300];
+
+          function handlePress() {
+            const event = navigation.emit({
+              type: 'tabPress',
+              target: route.key,
+              canPreventDefault: true,
+            });
+
+            if (!isFocused && !event.defaultPrevented) {
+              navigation.navigate(route.name, route.params);
+            }
+          }
+
+          return (
+            <Pressable
+              accessibilityLabel={options.tabBarAccessibilityLabel}
+              accessibilityRole="button"
+              accessibilityState={isFocused ? { selected: true } : {}}
+              key={route.key}
+              onPress={handlePress}
+              style={({ pressed }) => [
+                styles.tabButton,
+                isFocused && styles.tabButtonActive,
+                pressed && styles.tabButtonPressed,
+              ]}>
+              {getTabIcon(route.name, color)}
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
 }
 
 export default function TabLayout() {
   const { session, isLoading, isPasswordRecovery } = useAuthSession();
   const { data: profile, isLoading: isProfileLoading } = useProfile();
-  const insets = useSafeAreaInsets();
-  const bottomInset =
-    Platform.OS === 'web'
-      ? Math.max(insets.bottom, 42)
-      : Platform.OS === 'android'
-        ? Math.max(insets.bottom, 18)
-        : Math.max(insets.bottom, 12);
-  const tabBarHeight = 86 + bottomInset;
-  const screenOptions = useMemo(
-    () => ({
-      tabBarActiveTintColor: colors.primary.light,
-      tabBarInactiveTintColor: colors.slate[300],
-      headerShown: false,
-      tabBarButton: HapticTab,
-      tabBarLabelStyle,
-      tabBarItemStyle,
-      tabBarStyle: {
-        bottom: 0,
-        elevation: 12,
-        height: tabBarHeight,
-        paddingBottom: bottomInset,
-        paddingTop: 12,
-        backgroundColor: colors.ink,
-        borderTopColor: 'rgba(255, 255, 255, 0.08)',
-        borderTopWidth: 1,
-        shadowColor: colors.ink,
-        shadowOffset: { width: 0, height: -8 },
-        shadowOpacity: 0.16,
-        shadowRadius: 18,
-      },
-    }),
-    [bottomInset, tabBarHeight]
-  );
 
   if (isLoading || (session && isProfileLoading)) {
     return (
@@ -99,41 +126,35 @@ export default function TabLayout() {
   }
 
   return (
-    <Tabs screenOptions={screenOptions}>
+    <Tabs tabBar={(props) => <PulseTabBar {...props} />} screenOptions={{ headerShown: false }}>
       <Tabs.Screen
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: HomeIcon,
         }}
       />
       <Tabs.Screen
         name="group"
         options={{
           title: 'Group',
-          tabBarIcon: GroupIcon,
         }}
       />
       <Tabs.Screen
         name="check-in"
         options={{
           title: 'Check-in',
-          tabBarButton: CheckInTabButton,
-          tabBarLabel: () => null,
         }}
       />
       <Tabs.Screen
         name="progress"
         options={{
           title: 'Progress',
-          tabBarIcon: ProgressIcon,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ProfileIcon,
         }}
       />
       <Tabs.Screen
@@ -158,5 +179,43 @@ const styles = StyleSheet.create({
     color: colors.slate[500],
     fontSize: 14,
     fontWeight: '600',
+  },
+  tabBar: {
+    alignItems: 'center',
+    backgroundColor: colors.ink,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 999,
+    borderWidth: 1,
+    elevation: 3,
+    flexDirection: 'row',
+    gap: 2,
+    height: 30,
+    justifyContent: 'center',
+    maxWidth: 214,
+    paddingHorizontal: 4,
+    shadowColor: colors.ink,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    width: '62%',
+  },
+  tabBarWrap: {
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    justifyContent: 'flex-start',
+    paddingTop: 2,
+  },
+  tabButton: {
+    alignItems: 'center',
+    borderRadius: 999,
+    height: 24,
+    justifyContent: 'center',
+    width: 34,
+  },
+  tabButtonActive: {
+    backgroundColor: colors.primary.light,
+  },
+  tabButtonPressed: {
+    opacity: 0.72,
   },
 });
