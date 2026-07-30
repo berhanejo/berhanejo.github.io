@@ -9,7 +9,7 @@ import { useCheckInFlow } from '@/lib/check-in/use-check-in-flow';
 export default function CheckInScreen() {
   const {
     currentUser,
-    activePrograms,
+    filteredActivePrograms,
     publishTargets,
     selectedPublishTarget,
     selectedPublishTargetId,
@@ -56,6 +56,7 @@ export default function CheckInScreen() {
   }
 
   const categoryColor = CATEGORY_COLORS[displayProgram.category];
+  const isMultiGroupPublish = Boolean(selectedPublishTarget?.matchingGoalIds?.length);
 
   return (
     <ScreenContainer>
@@ -71,14 +72,55 @@ export default function CheckInScreen() {
 
         <View style={styles.goalSelectorCard}>
           <View style={styles.goalSelectorHeader}>
-            <Text style={styles.cardLabel}>Goal / Challenge</Text>
+            <Text style={styles.cardLabel}>Publish proof to</Text>
             <Text style={styles.goalSelectorMeta}>
-              {activePrograms.length <= 1 ? 'Auto-selected' : 'Select one to post'}
+              {isMultiGroupPublish ? 'Multiple groups' : selectedPublishTarget?.groupId ? 'Group visible' : 'Private'}
             </Text>
           </View>
-          {activePrograms.length > 0 ? (
+          <View style={styles.publishTargetList}>
+            {publishTargets.map((target) => {
+              const isSelected = selectedPublishTargetId === target.id;
+
+              return (
+                <Pressable
+                  key={target.id}
+                  disabled={hasCheckedInToday}
+                  onPress={() => setSelectedPublishTargetId(target.id)}
+                  style={({ pressed }) => [
+                    styles.publishTargetChip,
+                    isSelected && styles.publishTargetChipSelected,
+                    hasCheckedInToday && styles.publishTargetChipDisabled,
+                    pressed && !hasCheckedInToday && styles.buttonPressed,
+                  ]}>
+                  <View style={styles.publishTargetTopRow}>
+                    <MaterialIcons
+                      name={target.groupId ? 'groups' : target.id.startsWith('matching:') ? 'hub' : 'lock'}
+                      size={17}
+                      color={isSelected ? '#ffffff' : '#475569'}
+                    />
+                    <Text style={[styles.publishTargetTitle, isSelected && styles.publishTargetTitleSelected]}>
+                      {target.label}
+                    </Text>
+                  </View>
+                  <Text style={[styles.publishTargetHelper, isSelected && styles.publishTargetHelperSelected]}>
+                    {target.helper}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={styles.goalSelectorCard}>
+          <View style={styles.goalSelectorHeader}>
+            <Text style={styles.cardLabel}>Goal / Challenge</Text>
+            <Text style={styles.goalSelectorMeta}>
+              {filteredActivePrograms.length <= 1 ? 'Auto-selected' : `${filteredActivePrograms.length} available`}
+            </Text>
+          </View>
+          {filteredActivePrograms.length > 0 ? (
             <View style={styles.goalSelectorList}>
-              {activePrograms.map((program) => {
+              {filteredActivePrograms.map((program) => {
                 const isSelected = selectedGoal?.id === program.id;
                 const goalStatus = ownActiveGoalStatuses.find((item) => item.goalId === program.id)?.status ?? 'pending';
                 const isDone = goalStatus === 'done';
@@ -131,7 +173,7 @@ export default function CheckInScreen() {
               })}
             </View>
           ) : (
-            <Text style={styles.goalMissingText}>No active goals. Activate one goal first.</Text>
+            <Text style={styles.goalMissingText}>No active goals for this destination. Add or copy a goal to use it here.</Text>
           )}
           {requiresGoalSelection && !selectedGoal ? (
             <Text style={styles.goalRequiredText}>Choose a goal before posting today&apos;s check-in.</Text>
@@ -152,47 +194,6 @@ export default function CheckInScreen() {
             <Text style={[styles.statusBadgeText, selectedGoal && hasCheckedInToday && styles.statusBadgeTextDone]}>
               {selectedGoal ? displayCheckIn.status : 'choose goal'}
             </Text>
-          </View>
-        </View>
-
-        <View style={styles.publishCard}>
-          <View style={styles.goalSelectorHeader}>
-            <Text style={styles.cardLabel}>Publish proof to</Text>
-            <Text style={styles.goalSelectorMeta}>
-              {selectedPublishTarget?.groupId ? 'Group visible' : 'Private'}
-            </Text>
-          </View>
-          <View style={styles.publishTargetList}>
-            {publishTargets.map((target) => {
-              const isSelected = selectedPublishTargetId === target.id;
-
-              return (
-                <Pressable
-                  key={target.id}
-                  disabled={!selectedGoal || hasCheckedInToday}
-                  onPress={() => setSelectedPublishTargetId(target.id)}
-                  style={({ pressed }) => [
-                    styles.publishTargetChip,
-                    isSelected && styles.publishTargetChipSelected,
-                    (!selectedGoal || hasCheckedInToday) && styles.publishTargetChipDisabled,
-                    pressed && selectedGoal && !hasCheckedInToday && styles.buttonPressed,
-                  ]}>
-                  <View style={styles.publishTargetTopRow}>
-                    <MaterialIcons
-                      name={target.groupId ? 'groups' : 'lock'}
-                      size={17}
-                      color={isSelected ? '#ffffff' : '#475569'}
-                    />
-                    <Text style={[styles.publishTargetTitle, isSelected && styles.publishTargetTitleSelected]}>
-                      {target.label}
-                    </Text>
-                  </View>
-                  <Text style={[styles.publishTargetHelper, isSelected && styles.publishTargetHelperSelected]}>
-                    {target.helper}
-                  </Text>
-                </Pressable>
-              );
-            })}
           </View>
         </View>
 
@@ -252,7 +253,9 @@ export default function CheckInScreen() {
                 ? 'Uploaded today.'
                 : !selectedGoal
                   ? 'Choose a goal above first.'
-                  : selectedPublishTarget?.groupId
+                  : isMultiGroupPublish
+                    ? `This proof will appear in ${selectedPublishTarget.label}.`
+                    : selectedPublishTarget?.groupId
                     ? `This proof will appear in ${selectedPublishTarget.label}.`
                     : 'This proof stays private in your own progress.'}
             </Text>
@@ -315,6 +318,8 @@ export default function CheckInScreen() {
                 : canSubmit
                   ? selectedPublishTarget?.groupId
                     ? `Shares this check-in with ${selectedPublishTarget.label}`
+                    : isMultiGroupPublish
+                      ? `Shares this check-in with ${selectedPublishTarget.label}`
                     : 'Saves this check-in privately'
                   : 'Select an image and add a caption to post today'}
           </Text>
@@ -359,6 +364,8 @@ export default function CheckInScreen() {
           <Text style={styles.noteText}>
             {selectedPublishTarget?.groupId
               ? `Your check-in appears only in ${selectedPublishTarget.label}, not publicly.`
+              : isMultiGroupPublish
+                ? `Your check-in appears in each matching private group, not publicly.`
               : 'Your check-in stays private and does not appear in a group feed.'}
           </Text>
         </View>

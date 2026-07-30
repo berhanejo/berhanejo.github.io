@@ -8,6 +8,19 @@ import { useAppSession } from '@/contexts/app-session';
 import { checkInByCategory } from '@/data/mock-data';
 import { getErrorMessage } from '@/lib/error-message';
 import { getCheckInCategoryContent } from '@/lib/check-in/category-content';
+import type { EnrichedGoal } from '@/lib/session/types';
+
+type PublishTarget = {
+  id: string;
+  label: string;
+  helper: string;
+  groupId: string | null;
+  matchingGoalIds?: string[];
+};
+
+function goalsMatch(a: EnrichedGoal, b: EnrichedGoal) {
+  return a.title === b.title && a.category === b.category;
+}
 
 export function useCheckInFlow() {
   const params = useLocalSearchParams<{ goalId?: string }>();
@@ -33,9 +46,10 @@ export function useCheckInFlow() {
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const requiresGoalSelection = activePrograms.length > 1;
-  const selectedGoal =
-    activePrograms.find((program) => program.id === selectedGoalId) ??
-    (requiresGoalSelection ? null : activePrograms[0] ?? null);
+  const selectedGoal = activePrograms.find((program) => program.id === selectedGoalId) ?? null;
+  const matchingSelectedGoals = selectedGoal
+    ? activePrograms.filter((program) => goalsMatch(program, selectedGoal))
+    : [];
   const displayProgram = selectedGoal ?? currentProgram ?? null;
   const selectedGoalStatus =
     ownActiveGoalStatuses.find((item) => item.goalId === selectedGoal?.id) ??
@@ -45,7 +59,7 @@ export function useCheckInFlow() {
     ownGoalLatestCheckIns.find((item) => item.goalId === selectedGoal?.id) ??
     ownGoalLatestCheckIns.find((item) => item.goalId === currentProgram?.id) ??
     null;
-  const hasCheckedInToday = selectedGoalStatus?.status === 'done';
+  const selectedGoalHasDuplicates = matchingSelectedGoals.length > 1;
   const latestCheckInId = selectedGoalLatest?.checkInId ?? null;
   const latestCheckInCaption = selectedGoalLatest?.caption ?? null;
   const latestCheckInImageUri = selectedGoalLatest?.imageUri ?? null;
@@ -55,26 +69,66 @@ export function useCheckInFlow() {
     : displayProgram
       ? checkInByCategory[displayProgram.category]
       : null;
-  const publishTargets = useMemo(
-    () => [
+  const publishTargets = useMemo<PublishTarget[]>(() => {
+    const targets: PublishTarget[] = [
       {
         id: 'private',
         label: 'Private',
-        helper: 'Only visible in your own progress',
+        helper: `${activePrograms.filter((program) => program.groupId === null).length} private goals`,
         groupId: null,
       },
       ...groupSummaries.map((group) => ({
         id: group.id,
         label: group.name,
-        helper: group.isActive ? 'Active group feed' : 'Group feed',
+        helper: `${activePrograms.filter((program) => program.groupId === group.id).length} group goals`,
         groupId: group.id,
       })),
-    ],
-    [groupSummaries]
-  );
+    ];
+
+    if (selectedGoalHasDuplicates) {
+      const groupedMatches = matchingSelectedGoals.filter((program) => program.groupId);
+      if (groupedMatches.length > 1) {
+        targets.unshift({
+          id: `matching:${selectedGoal?.category}:${selectedGoal?.title}`,
+          label: 'All matching groups',
+          helper: `${groupedMatches.length} group copies of this goal`,
+          groupId: null,
+          matchingGoalIds: groupedMatches.map((program) => program.id),
+        });
+      }
+    }
+
+    return targets;
+  }, [activePrograms, groupSummaries, matchingSelectedGoals, selectedGoal?.category, selectedGoal?.title, selectedGoalHasDuplicates]);
   const selectedPublishTarget =
     publishTargets.find((target) => target.id === selectedPublishTargetId) ?? publishTargets[0];
-  const canSubmit = Boolean(selectedGoal && caption.trim() && selectedImageUri && selectedPublishTarget);
+  const filteredActivePrograms = useMemo(() => {
+    if (selectedPublishTarget?.matchingGoalIds) {
+      return activePrograms.filter((program) => selectedPublishTarget.matchingGoalIds?.includes(program.id));
+    }
+
+    return activePrograms.filter((program) => program.groupId === selectedPublishTarget?.groupId);
+  }, [activePrograms, selectedPublishTarget]);
+  const selectedSubmitGoals = useMemo(() => {
+    if (!selectedGoal) {
+      return [];
+    }
+
+    if (selectedPublishTarget?.matchingGoalIds) {
+      return filteredActivePrograms.filter((program) => goalsMatch(program, selectedGoal));
+    }
+
+    return filteredActivePrograms.filter((program) => program.id === selectedGoal.id);
+  }, [filteredActivePrograms, selectedGoal, selectedPublishTarget]);
+  const hasCheckedInToday =
+    selectedSubmitGoals.length > 0 &&
+    selectedSubmitGoals.every(
+      (program) => ownActiveGoalStatuses.find((item) => item.goalId === program.id)?.status === 'done'
+    );
+  const pendingSubmitGoals = selectedSubmitGoals.filter(
+    (program) => ownActiveGoalStatuses.find((item) => item.goalId === program.id)?.status !== 'done'
+  );
+  const canSubmit = Boolean(selectedGoal && pendingSubmitGoals.length > 0 && caption.trim() && selectedImageUri && selectedPublishTarget);
   const categoryContent = getCheckInCategoryContent(displayProgram?.category);
 
   useEffect(() => {
@@ -89,6 +143,7 @@ export function useCheckInFlow() {
     }
 
     setSelectedGoalId(match.id);
+    setSelectedPublishTargetId(match.groupId ?? 'private');
   }, [activePrograms, params.goalId]);
 
   useEffect(() => {
@@ -105,6 +160,7 @@ export function useCheckInFlow() {
     if (activePrograms.length === 1) {
       const onlyGoalId = activePrograms[0].id;
       setSelectedGoalId(onlyGoalId);
+      setSelectedPublishTargetId(activePrograms[0].groupId ?? 'private');
       if (currentProgram?.id !== onlyGoalId) {
         setPrimaryProgram(onlyGoalId);
       }
@@ -113,6 +169,20 @@ export function useCheckInFlow() {
 
     setSelectedGoalId((prev) => (prev && activePrograms.some((program) => program.id === prev) ? prev : null));
   }, [activePrograms, currentProgram?.id, params.goalId, setPrimaryProgram]);
+
+  useEffect(() => {
+    if (!selectedPublishTarget) {
+      return;
+    }
+
+    setSelectedGoalId((prev) => {
+      if (prev && filteredActivePrograms.some((program) => program.id === prev)) {
+        return prev;
+      }
+
+      return filteredActivePrograms[0]?.id ?? null;
+    });
+  }, [filteredActivePrograms, selectedPublishTarget]);
 
   useEffect(() => {
     if (!hasCheckedInToday) {
@@ -132,12 +202,22 @@ export function useCheckInFlow() {
     setSelectedImageUri(null);
   }, [selectedGoalId]);
 
-  useEffect(() => {
-    setSelectedPublishTargetId(selectedGoal?.groupId ?? 'private');
-  }, [selectedGoal?.groupId, selectedGoal?.id]);
-
   function handleSelectGoal(goalId: string) {
+    const goal = activePrograms.find((program) => program.id === goalId);
+    if (!goal) {
+      return;
+    }
+
+    const matchingGroupGoals = activePrograms.filter((program) => goalsMatch(program, goal) && program.groupId);
     setSelectedGoalId(goalId);
+
+    if (goal.groupId) {
+      setSelectedPublishTargetId(goal.groupId);
+    } else if (matchingGroupGoals.length > 1) {
+      setSelectedPublishTargetId(`matching:${goal.category}:${goal.title}`);
+    } else {
+      setSelectedPublishTargetId('private');
+    }
   }
 
   async function handleTakePhoto() {
@@ -198,7 +278,9 @@ export function useCheckInFlow() {
     setSubmitError(null);
 
     try {
-      await submitTodayCheckIn(selectedGoal.id, caption, selectedImageUri, selectedPublishTarget.groupId);
+      for (const goal of pendingSubmitGoals) {
+        await submitTodayCheckIn(goal.id, caption, selectedImageUri, goal.groupId ?? selectedPublishTarget.groupId);
+      }
       if (Platform.OS !== 'web') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       }
@@ -258,6 +340,7 @@ export function useCheckInFlow() {
   return {
     currentUser,
     activePrograms,
+    filteredActivePrograms,
     publishTargets,
     selectedPublishTarget,
     selectedPublishTargetId,

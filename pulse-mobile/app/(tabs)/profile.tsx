@@ -7,10 +7,13 @@ import { ScreenContainer } from '@/components/screen-container';
 import { useAppSession } from '@/contexts/app-session';
 import { useAuthSession } from '@/contexts/auth-session';
 import { categoryOptions } from '@/data/mock-data';
+import { useResetAccountData } from '@/lib/queries/account-reset';
 
 export default function ProfileScreen() {
   const { signOut } = useAuthSession();
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
+  const resetAccountDataMutation = useResetAccountData();
   const {
     currentProgram,
     currentUser,
@@ -49,6 +52,15 @@ export default function ProfileScreen() {
     await signOut();
     setIsSigningOut(false);
   }, [signOut]);
+  const handleResetWorkspace = useCallback(async () => {
+    try {
+      await resetAccountDataMutation.mutateAsync();
+      setIsResetConfirmOpen(false);
+      router.replace('/onboarding/welcome');
+    } catch (error) {
+      console.warn('Workspace reset failed:', error);
+    }
+  }, [resetAccountDataMutation]);
 
   return (
     <ScreenContainer>
@@ -163,6 +175,50 @@ export default function ProfileScreen() {
           <Text style={styles.helper}>A simple daily reminder helps you post proof before the day closes.</Text>
         </View>
       ) : null}
+
+      <View style={styles.dangerCard}>
+        <Text style={styles.dangerLabel}>Reset workspace</Text>
+        <Text style={styles.dangerTitle}>Start fresh</Text>
+        <Text style={styles.dangerHelper}>
+          Deletes your goals, check-ins, history events, reactions, and group memberships. Groups you created are removed by the Supabase reset function.
+        </Text>
+        {resetAccountDataMutation.error ? (
+          <Text style={styles.errorText}>
+            {resetAccountDataMutation.error instanceof Error
+              ? resetAccountDataMutation.error.message
+              : 'Could not reset your workspace.'}
+          </Text>
+        ) : null}
+        {isResetConfirmOpen ? (
+          <View style={styles.resetConfirmActions}>
+            <Pressable
+              disabled={resetAccountDataMutation.isPending}
+              onPress={() => setIsResetConfirmOpen(false)}
+              style={({ pressed }) => [
+                styles.cancelResetButton,
+                pressed && !resetAccountDataMutation.isPending && styles.buttonPressed,
+              ]}>
+              <Text style={styles.cancelResetButtonText}>Cancel</Text>
+            </Pressable>
+            <Pressable
+              disabled={resetAccountDataMutation.isPending}
+              onPress={handleResetWorkspace}
+              style={({ pressed }) => [
+                styles.confirmResetButton,
+                resetAccountDataMutation.isPending && styles.disabledButton,
+                pressed && !resetAccountDataMutation.isPending && styles.buttonPressed,
+              ]}>
+              <Text style={styles.confirmResetButtonText}>
+                {resetAccountDataMutation.isPending ? 'Resetting…' : 'Delete everything'}
+              </Text>
+            </Pressable>
+          </View>
+        ) : (
+          <Pressable onPress={() => setIsResetConfirmOpen(true)} style={styles.resetButton}>
+            <Text style={styles.resetButtonText}>Reset everything</Text>
+          </Pressable>
+        )}
+      </View>
 
       <Pressable onPress={handleSignOut} style={styles.logoutButton}>
         <Text style={styles.logoutButtonText}>{isSigningOut ? 'Logging out…' : 'Log out'}</Text>
@@ -386,6 +442,87 @@ const styles = StyleSheet.create({
     color: '#102a19',
     fontSize: 13,
     fontWeight: '600',
+  },
+  dangerCard: {
+    backgroundColor: '#450a0a',
+    borderColor: '#991b1b',
+    borderRadius: 22,
+    borderWidth: 1,
+    gap: 8,
+    padding: 18,
+  },
+  dangerLabel: {
+    color: '#fca5a5',
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+  dangerTitle: {
+    color: '#ffffff',
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  dangerHelper: {
+    color: '#fecaca',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  errorText: {
+    color: '#fee2e2',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 18,
+  },
+  resetButton: {
+    backgroundColor: '#dc2626',
+    borderRadius: 14,
+    marginTop: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  resetButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  resetConfirmActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 6,
+  },
+  cancelResetButton: {
+    backgroundColor: '#7f1d1d',
+    borderRadius: 14,
+    flex: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  cancelResetButtonText: {
+    color: '#fecaca',
+    fontSize: 14,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  confirmResetButton: {
+    backgroundColor: '#ef4444',
+    borderRadius: 14,
+    flex: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  confirmResetButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  disabledButton: {
+    opacity: 0.6,
+  },
+  buttonPressed: {
+    opacity: 0.78,
   },
   logoutButton: {
     backgroundColor: '#fee2e2',

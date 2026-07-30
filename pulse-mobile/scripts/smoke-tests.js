@@ -444,4 +444,44 @@ test('web tab navigation is bottom, full-width, labeled, and safe-area aware', (
   );
 });
 
+test('profile exposes a guarded workspace reset action', () => {
+  const profileSource = fs.readFileSync(path.join(projectRoot, 'app/(tabs)/profile.tsx'), 'utf8');
+  const resetHookSource = fs.readFileSync(path.join(projectRoot, 'lib/queries/account-reset.ts'), 'utf8');
+  const resetRpcSource = fs.readFileSync(path.join(projectRoot, 'supabase/reset-workspace-rpc.sql'), 'utf8');
+
+  assert.ok(profileSource.includes('Reset everything'), 'profile should expose a reset button');
+  assert.ok(profileSource.includes('Delete everything'), 'profile reset should require confirmation');
+  assert.ok(resetHookSource.includes("supabase.rpc('reset_my_workspace')"), 'reset should use the Supabase RPC first');
+  assert.ok(resetHookSource.includes("deleteOwnRows('goals', userId)"), 'reset fallback should delete own goals');
+  assert.ok(resetHookSource.includes("deleteOwnRows('check_ins', userId)"), 'reset fallback should delete own check-ins');
+  assert.ok(resetRpcSource.includes('create or replace function public.reset_my_workspace()'));
+  assert.ok(resetRpcSource.includes('onboarding_completed = false'), 'reset should restart onboarding');
+});
+
+test('check-in flow filters goals by publish destination', () => {
+  const checkInFlowSource = fs.readFileSync(path.join(projectRoot, 'lib/check-in/use-check-in-flow.ts'), 'utf8');
+  const checkInScreenSource = fs.readFileSync(path.join(projectRoot, 'app/(tabs)/check-in.tsx'), 'utf8');
+
+  assert.ok(
+    checkInFlowSource.includes('filteredActivePrograms'),
+    'check-in flow should expose goals filtered by selected publish target'
+  );
+  assert.ok(
+    checkInFlowSource.includes('program.groupId === selectedPublishTarget?.groupId'),
+    'group publish targets should only show matching group goals'
+  );
+  assert.ok(
+    checkInFlowSource.includes('matchingGoalIds'),
+    'ambiguous copied goals should support posting to matching group copies'
+  );
+  assert.ok(
+    checkInFlowSource.includes('pendingSubmitGoals'),
+    'multi-target submit should skip already-completed matching goals'
+  );
+  assert.ok(
+    checkInScreenSource.includes('filteredActivePrograms.map'),
+    'check-in screen should render the filtered goal list'
+  );
+});
+
 console.log('Smoke tests passed');
