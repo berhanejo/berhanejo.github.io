@@ -2,44 +2,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import type { createJSONStorage as createJSONStorageType, persist as persistType } from 'zustand/middleware';
 
-import { GoalCategory, MockGroupMember, Program } from '@/data/mock-data';
-
-export type LocalCheckInRecord = {
-  id: string;
-  userId: string;
-  goalId: string;
-  date: string;
-  caption: string;
-  imageUri: string;
-  goalRun?: number;
-};
-
-export type PersistedUserData = {
-  id: string;
-  name: string;
-  goal: string;
-  groupName: string;
-  groupMembers: MockGroupMember[];
-  selectedCategoryIds: GoalCategory[];
-  selectedProgramIds: string[];
-  activeProgramIds: string[];
-  maxActivePrograms: number;
-  goalRunById: Record<string, number>;
-  goalRunStartedAtById: Record<string, string>;
-  archivedProgramIds: string[];
-  customPrograms: Program[];
-  checkIns: LocalCheckInRecord[];
-};
-
-type AppStoreState = {
+type AppPreferencesState = {
   hasHydrated: boolean;
-  usersById: Record<string, PersistedUserData>;
-  mockAuthUserId: string | null;
+  activeGroupId: string | null;
+  maxActivePrograms: number;
+  primaryGoalId: string | null;
   markHydrated: () => void;
-  initializeIfEmpty: (seedUsersById: Record<string, PersistedUserData>) => void;
-  setMockAuthUserId: (userId: string | null) => void;
-  upsertUser: (user: PersistedUserData) => void;
-  updateUser: (userId: string, updater: (user: PersistedUserData) => PersistedUserData) => void;
+  setActiveGroupId: (groupId: string | null) => void;
+  setMaxActivePrograms: (nextMax: number) => void;
+  setPrimaryGoalId: (goalId: string | null) => void;
 };
 
 // Force CJS resolution for web bundling to avoid `import.meta` from the ESM middleware bundle.
@@ -48,66 +19,31 @@ const { createJSONStorage, persist } = require('zustand/middleware') as {
   persist: typeof persistType;
 };
 
-export const useAppStore = create<AppStoreState>()(
+/**
+ * Device-local UI preferences only. All real app data (goals, groups,
+ * check-ins) lives in Supabase and is fetched via the react-query hooks in
+ * lib/queries — nothing user-generated is persisted here.
+ */
+export const useAppStore = create<AppPreferencesState>()(
   persist(
     (set) => ({
       hasHydrated: false,
-      usersById: {},
-      mockAuthUserId: null,
+      activeGroupId: null,
+      maxActivePrograms: 3,
+      primaryGoalId: null,
       markHydrated: () => set({ hasHydrated: true }),
-      initializeIfEmpty: (seedUsersById) =>
-        set((state) => {
-          if (Object.keys(state.usersById).length > 0) {
-            return state;
-          }
-
-          return {
-            ...state,
-            usersById: seedUsersById,
-          };
-        }),
-      setMockAuthUserId: (userId) => set({ mockAuthUserId: userId }),
-      upsertUser: (user) =>
-        set((state) => {
-          const existing = state.usersById[user.id];
-          if (existing === user) {
-            return state;
-          }
-
-          return {
-            ...state,
-            usersById: {
-              ...state.usersById,
-              [user.id]: user,
-            },
-          };
-        }),
-      updateUser: (userId, updater) =>
-        set((state) => {
-          const existing = state.usersById[userId];
-          if (!existing) {
-            return state;
-          }
-          const nextUser = updater(existing);
-          if (nextUser === existing) {
-            return state;
-          }
-
-          return {
-            ...state,
-            usersById: {
-              ...state.usersById,
-              [userId]: nextUser,
-            },
-          };
-        }),
+      setActiveGroupId: (groupId) => set({ activeGroupId: groupId }),
+      setMaxActivePrograms: (nextMax) =>
+        set({ maxActivePrograms: Math.max(1, Math.min(Math.round(nextMax), 10)) }),
+      setPrimaryGoalId: (goalId) => set({ primaryGoalId: goalId }),
     }),
     {
-      name: 'pulse-app-store-v1',
+      name: 'pulse-app-preferences-v2',
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({
-        usersById: state.usersById,
-        mockAuthUserId: state.mockAuthUserId,
+        activeGroupId: state.activeGroupId,
+        maxActivePrograms: state.maxActivePrograms,
+        primaryGoalId: state.primaryGoalId,
       }),
       onRehydrateStorage: () => (state) => {
         state?.markHydrated();

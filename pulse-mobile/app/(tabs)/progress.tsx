@@ -21,6 +21,7 @@ export default function ProgressScreen() {
     completedDays,
     relevantDays,
     missedDays,
+    historyItems,
   } =
     useAppSession();
   const weeklyCompleted = currentWeekCheckIns.filter((item) => item.status === 'done').length;
@@ -29,6 +30,22 @@ export default function ProgressScreen() {
   const hasCompletedCheckIns = completedDays > 0;
   const dayStatusLabel =
     todayOverallStatus === 'done' ? 'Done' : todayOverallStatus === 'missed' ? 'Missed' : 'In progress';
+
+  if (!currentProgram) {
+    return (
+      <ScreenContainer>
+        <View style={styles.header}>
+          <Text style={styles.kicker}>Progress</Text>
+          <Text style={styles.title}>Visible consistency</Text>
+          <Text style={styles.subtitle}>Add a goal to start tracking your streak and completion rate.</Text>
+        </View>
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyTitle}>No progress yet</Text>
+          <Text style={styles.emptyText}>Your streak, weekly activity, and completion pattern will show up after your first goal.</Text>
+        </View>
+      </ScreenContainer>
+    );
+  }
 
   return (
     <ScreenContainer>
@@ -211,6 +228,26 @@ export default function ProgressScreen() {
           </View>
         )}
       </View>
+
+      <View style={styles.historyCard}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>History</Text>
+          <Text style={styles.sectionMeta}>{historyItems.length} events</Text>
+        </View>
+        <Text style={styles.sectionSubtitle}>Your recent check-ins and edits, newest first.</Text>
+        <View style={styles.historyList}>
+          {historyItems.slice(0, 12).map((item) => (
+            <View key={item.id} style={styles.historyItem}>
+              <View style={styles.historyDot} />
+              <View style={styles.historyMeta}>
+                <Text style={styles.historyTitle}>{item.title}</Text>
+                {item.caption ? <Text style={styles.historyCaption}>{item.caption}</Text> : null}
+              </View>
+              <Text style={styles.historyDate}>{item.dateLabel}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
     </ScreenContainer>
   );
 }
@@ -228,7 +265,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   title: {
-    color: '#0f172a',
+    color: '#102a19',
     fontSize: 30,
     fontWeight: '700',
     letterSpacing: -0.8,
@@ -239,18 +276,18 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   summaryCard: {
-    backgroundColor: '#0f172a',
+    backgroundColor: '#102a19',
     borderRadius: 28,
     padding: 22,
     gap: 12,
-    shadowColor: '#0f172a',
+    shadowColor: '#102a19',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.1,
     shadowRadius: 18,
     elevation: 3,
   },
   programLabel: {
-    color: '#93c5fd',
+    color: '#86efac',
     fontSize: 13,
     fontWeight: '700',
     textTransform: 'uppercase',
@@ -286,13 +323,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   progressTrack: {
-    backgroundColor: '#1e293b',
+    backgroundColor: '#164e2b',
     borderRadius: 999,
     height: 10,
     overflow: 'hidden',
   },
   progressFill: {
-    backgroundColor: '#38bdf8',
+    backgroundColor: '#facc15',
     borderRadius: 999,
     height: '100%',
   },
@@ -308,7 +345,7 @@ const styles = StyleSheet.create({
     gap: 14,
     justifyContent: 'space-between',
     padding: 18,
-    shadowColor: '#0f172a',
+    shadowColor: '#102a19',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.04,
     shadowRadius: 14,
@@ -319,7 +356,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   todayAggregateTitle: {
-    color: '#0f172a',
+    color: '#102a19',
     fontSize: 24,
     fontWeight: '700',
     letterSpacing: -0.6,
@@ -338,7 +375,7 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 8,
     padding: 18,
-    shadowColor: '#0f172a',
+    shadowColor: '#102a19',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.04,
     shadowRadius: 14,
@@ -349,7 +386,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     gap: 10,
     padding: 18,
-    shadowColor: '#0f172a',
+    shadowColor: '#102a19',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.04,
     shadowRadius: 14,
@@ -375,7 +412,7 @@ const styles = StyleSheet.create({
     paddingRight: 8,
   },
   goalBreakdownTitle: {
-    color: '#0f172a',
+    color: '#102a19',
     fontSize: 14,
     fontWeight: '700',
   },
@@ -423,7 +460,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   metricValue: {
-    color: '#0f172a',
+    color: '#102a19',
     fontSize: 28,
     fontWeight: '700',
     letterSpacing: -0.6,
@@ -437,11 +474,62 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 20,
     gap: 16,
-    shadowColor: '#0f172a',
+    shadowColor: '#102a19',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.04,
     shadowRadius: 14,
     elevation: 1,
+  },
+  historyCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    gap: 14,
+    padding: 20,
+    shadowColor: '#102a19',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.04,
+    shadowRadius: 14,
+    elevation: 1,
+  },
+  historyList: {
+    gap: 10,
+  },
+  historyItem: {
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderColor: '#e2e8f0',
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  historyDot: {
+    backgroundColor: '#16a34a',
+    borderRadius: 999,
+    height: 10,
+    width: 10,
+  },
+  historyMeta: {
+    flex: 1,
+    minWidth: 0,
+  },
+  historyTitle: {
+    color: '#102a19',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  historyCaption: {
+    color: '#64748b',
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 2,
+  },
+  historyDate: {
+    color: '#64748b',
+    fontSize: 12,
+    fontWeight: '700',
   },
   emptyState: {
     backgroundColor: '#f8fafc',
@@ -450,7 +538,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   emptyTitle: {
-    color: '#0f172a',
+    color: '#102a19',
     fontSize: 17,
     fontWeight: '700',
   },
@@ -466,7 +554,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   sectionTitle: {
-    color: '#0f172a',
+    color: '#102a19',
     fontSize: 22,
     fontWeight: '700',
   },
@@ -504,7 +592,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#eef2ff',
   },
   dayCardToday: {
-    borderColor: '#2563eb',
+    borderColor: '#16a34a',
     borderWidth: 1,
   },
   dayDot: {
@@ -524,10 +612,10 @@ const styles = StyleSheet.create({
     color: '#64748b',
   },
   dayStatusPending: {
-    color: '#334155',
+    color: '#2f5f3b',
   },
   dayLabel: {
-    color: '#334155',
+    color: '#2f5f3b',
     fontSize: 11,
     fontWeight: '600',
     textAlign: 'center',

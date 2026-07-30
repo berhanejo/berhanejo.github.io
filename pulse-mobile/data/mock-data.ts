@@ -1,36 +1,4 @@
-export type MemberStatus = 'done' | 'pending' | 'missed';
 export type GoalCategory = 'fitness' | 'learning' | 'reading' | 'mindset';
-export type ProofType = 'photo' | 'video' | 'text' | 'screenshot';
-
-export type GroupMember = {
-  id: string;
-  name: string;
-  status: MemberStatus;
-};
-
-export type MockGroupMember = {
-  id: string;
-  name: string;
-};
-
-export type MockCheckIn = {
-  date: string;
-  userId: string;
-  programId: string;
-  note: string;
-  submittedAt?: string;
-};
-
-export type MockUser = {
-  id: string;
-  name: string;
-  goal: string;
-  groupName: string;
-  groupMembers: MockGroupMember[];
-  selectedCategoryIds: GoalCategory[];
-  selectedProgramIds: string[];
-  activeProgramIds: string[];
-};
 
 export type Program = {
   id: string;
@@ -38,17 +6,14 @@ export type Program = {
   category: GoalCategory;
   categoryLabel: string;
   focus: string;
-  day: number;
   totalDays: number;
-  streak: number;
-  completionRate: number;
   nextReminder: string;
   proofLabel: string;
   proofExamples: string[];
 };
 
-export type CheckIn = {
-  status: MemberStatus;
+export type CheckInPrompt = {
+  status: 'done' | 'pending';
   prompt: string;
   instructions: string;
   captionPlaceholder: string;
@@ -63,10 +28,7 @@ export const programsByCategory: Record<GoalCategory, Program[]> = {
       category: 'fitness',
       categoryLabel: 'Fitness',
       focus: 'Build a simple daily movement routine with one consistent walk and visible proof.',
-      day: 12,
       totalDays: 30,
-      streak: 6,
-      completionRate: 84,
       nextReminder: '07:00',
       proofLabel: 'Proof',
       proofExamples: ['workout photo', 'movement clip', 'step screenshot', 'gym mirror shot'],
@@ -77,10 +39,7 @@ export const programsByCategory: Record<GoalCategory, Program[]> = {
       category: 'fitness',
       categoryLabel: 'Fitness',
       focus: 'Stay accountable to short strength sessions and keep momentum visible each day.',
-      day: 9,
       totalDays: 45,
-      streak: 4,
-      completionRate: 78,
       nextReminder: '18:30',
       proofLabel: 'Proof',
       proofExamples: ['workout photo', 'set list screenshot', 'movement clip', 'post-session mirror shot'],
@@ -91,10 +50,7 @@ export const programsByCategory: Record<GoalCategory, Program[]> = {
       category: 'fitness',
       categoryLabel: 'Fitness',
       focus: 'Use short mobility sessions to rebuild consistency without overcomplicating the routine.',
-      day: 7,
       totalDays: 21,
-      streak: 5,
-      completionRate: 86,
       nextReminder: '20:00',
       proofLabel: 'Proof',
       proofExamples: ['stretching photo', 'mobility clip', 'routine screenshot', 'floor setup photo'],
@@ -107,10 +63,7 @@ export const programsByCategory: Record<GoalCategory, Program[]> = {
       category: 'learning',
       categoryLabel: 'Learning',
       focus: 'Build a daily study habit with one focused session and visible proof.',
-      day: 12,
       totalDays: 30,
-      streak: 6,
-      completionRate: 84,
       nextReminder: '20:00',
       proofLabel: 'Proof',
       proofExamples: ['study desk photo', 'course progress screenshot', 'workbook page', 'short completion clip'],
@@ -121,10 +74,7 @@ export const programsByCategory: Record<GoalCategory, Program[]> = {
       category: 'learning',
       categoryLabel: 'Learning',
       focus: 'Practice a language daily and make progress visible through simple proof.',
-      day: 18,
       totalDays: 60,
-      streak: 10,
-      completionRate: 88,
       nextReminder: '19:00',
       proofLabel: 'Proof',
       proofExamples: ['lesson screenshot', 'notes page', 'vocabulary card', 'study setup photo'],
@@ -135,10 +85,7 @@ export const programsByCategory: Record<GoalCategory, Program[]> = {
       category: 'learning',
       categoryLabel: 'Learning',
       focus: 'Ship one focused learning block every day around a single skill.',
-      day: 5,
       totalDays: 21,
-      streak: 3,
-      completionRate: 80,
       nextReminder: '21:00',
       proofLabel: 'Proof',
       proofExamples: ['project screenshot', 'practice notes', 'tutorial checkpoint', 'desk photo'],
@@ -151,10 +98,7 @@ export const programsByCategory: Record<GoalCategory, Program[]> = {
       category: 'reading',
       categoryLabel: 'Reading',
       focus: 'Finish a small daily reading block and keep your progress visible every day.',
-      day: 14,
       totalDays: 30,
-      streak: 8,
-      completionRate: 87,
       nextReminder: '21:30',
       proofLabel: 'Proof',
       proofExamples: ['book page photo', 'reading tracker screenshot', 'highlight note', 'short reflection note'],
@@ -165,10 +109,7 @@ export const programsByCategory: Record<GoalCategory, Program[]> = {
       category: 'reading',
       categoryLabel: 'Reading',
       focus: 'Read a nonfiction chapter daily and capture one key takeaway as proof.',
-      day: 6,
       totalDays: 21,
-      streak: 4,
-      completionRate: 82,
       nextReminder: '20:30',
       proofLabel: 'Proof',
       proofExamples: ['chapter photo', 'kindle screenshot', 'margin note', 'takeaway summary'],
@@ -179,10 +120,7 @@ export const programsByCategory: Record<GoalCategory, Program[]> = {
       category: 'reading',
       categoryLabel: 'Reading',
       focus: 'Make evening reading a stable ritual with one visible check-in every night.',
-      day: 16,
       totalDays: 45,
-      streak: 11,
-      completionRate: 90,
       nextReminder: '22:00',
       proofLabel: 'Proof',
       proofExamples: ['book cover photo', 'page snapshot', 'reading tracker entry', 'short note'],
@@ -195,10 +133,7 @@ export const programsByCategory: Record<GoalCategory, Program[]> = {
       category: 'mindset',
       categoryLabel: 'Mindset',
       focus: 'Create a calm daily reset ritual with a short reflection and visible proof.',
-      day: 10,
       totalDays: 30,
-      streak: 7,
-      completionRate: 85,
       nextReminder: '08:00',
       proofLabel: 'Proof',
       proofExamples: ['journal photo', 'reset checklist', 'reflection note', 'habit tracker screenshot'],
@@ -209,10 +144,7 @@ export const programsByCategory: Record<GoalCategory, Program[]> = {
       category: 'mindset',
       categoryLabel: 'Mindset',
       focus: 'Build a short gratitude practice and make completion visible to your group.',
-      day: 8,
       totalDays: 21,
-      streak: 5,
-      completionRate: 83,
       nextReminder: '21:00',
       proofLabel: 'Proof',
       proofExamples: ['journal entry photo', 'gratitude note', 'checklist screenshot', 'reflection card'],
@@ -223,10 +155,7 @@ export const programsByCategory: Record<GoalCategory, Program[]> = {
       category: 'mindset',
       categoryLabel: 'Mindset',
       focus: 'End each day with a brief reset and keep the streak visible.',
-      day: 17,
       totalDays: 45,
-      streak: 9,
-      completionRate: 81,
       nextReminder: '22:15',
       proofLabel: 'Proof',
       proofExamples: ['reflection note', 'journal photo', 'reset checklist', 'mood tracker screenshot'],
@@ -234,9 +163,7 @@ export const programsByCategory: Record<GoalCategory, Program[]> = {
   ],
 };
 
-export const defaultProgram = programsByCategory.learning[0];
-
-export const checkInByCategory: Record<GoalCategory, CheckIn> = {
+export const checkInByCategory: Record<GoalCategory, CheckInPrompt> = {
   fitness: {
     status: 'pending',
     prompt: 'Share proof that you completed today’s movement or training session.',
@@ -293,103 +220,3 @@ export const categoryOptions = [
     description: 'Improve your daily reset, reflection, and mental clarity routines.',
   },
 ] as const;
-
-export const coachMessage = {
-  title: 'Consistency beats intensity.',
-  body: 'One clear check-in keeps the routine alive. Finish today, post proof, and protect the streak.',
-};
-
-export const mockUsers: MockUser[] = [
-  {
-    id: 'mock-alex',
-    name: 'Alex Carter',
-    goal: 'Stay consistent with daily focused learning for 30 days',
-    groupName: 'Daily Builders',
-    groupMembers: [
-      { id: 'alex-1', name: 'Emma' },
-      { id: 'alex-2', name: 'Noah' },
-      { id: 'alex-3', name: 'Lina' },
-    ],
-    selectedCategoryIds: ['learning', 'mindset'],
-    selectedProgramIds: ['learning-1', 'mindset-1'],
-    activeProgramIds: ['learning-1'],
-  },
-  {
-    id: 'mock-samira',
-    name: 'Samira Khan',
-    goal: 'Build a steady fitness + reading routine with visible daily proof',
-    groupName: 'Momentum Circle',
-    groupMembers: [
-      { id: 'samira-1', name: 'Mia' },
-      { id: 'samira-2', name: 'Jonas' },
-      { id: 'samira-3', name: 'Levi' },
-    ],
-    selectedCategoryIds: ['fitness', 'reading'],
-    selectedProgramIds: ['fitness-1', 'reading-1'],
-    activeProgramIds: ['fitness-1', 'reading-1'],
-  },
-  {
-    id: 'mock-luca',
-    name: 'Luca Meyer',
-    goal: 'Improve mindset consistency and finish one reflection every evening',
-    groupName: 'Reset Crew',
-    groupMembers: [
-      { id: 'luca-1', name: 'Nora' },
-      { id: 'luca-2', name: 'Kai' },
-      { id: 'luca-3', name: 'Sven' },
-    ],
-    selectedCategoryIds: ['mindset'],
-    selectedProgramIds: ['mindset-2'],
-    activeProgramIds: ['mindset-2'],
-  },
-];
-
-export const mockCheckIns: MockCheckIn[] = [
-  {
-    date: '2026-03-18',
-    userId: 'mock-alex',
-    programId: 'learning-1',
-    note: 'Focused 45 minutes on lesson 3.',
-    submittedAt: '2026-03-18T19:40:00.000Z',
-  },
-  {
-    date: '2026-03-19',
-    userId: 'mock-alex',
-    programId: 'learning-1',
-    note: 'Finished review and summary.',
-    submittedAt: '2026-03-19T20:05:00.000Z',
-  },
-  {
-    date: '2026-03-18',
-    userId: 'mock-samira',
-    programId: 'fitness-1',
-    note: 'Walked 35 minutes before work.',
-    submittedAt: '2026-03-18T07:10:00.000Z',
-  },
-  {
-    date: '2026-03-20',
-    userId: 'mock-samira',
-    programId: 'reading-1',
-    note: 'Read 24 pages and captured highlights.',
-    submittedAt: '2026-03-20T21:20:00.000Z',
-  },
-  {
-    date: '2026-03-20',
-    userId: 'mock-luca',
-    programId: 'mindset-2',
-    note: 'Completed gratitude journaling.',
-    submittedAt: '2026-03-20T21:45:00.000Z',
-  },
-  {
-    date: '2026-03-21',
-    userId: 'alex-1',
-    programId: 'learning-1',
-    note: 'Group check-in complete.',
-  },
-  {
-    date: '2026-03-21',
-    userId: 'samira-2',
-    programId: 'fitness-1',
-    note: 'Evening training done.',
-  },
-];

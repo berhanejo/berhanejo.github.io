@@ -2,13 +2,25 @@ import { router } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Avatar } from '@/components/avatar';
+import { EmptyState } from '@/components/empty-state';
 import { ProgressRing } from '@/components/progress-ring';
 import { ScreenContainer } from '@/components/screen-container';
+import { StreakBadge } from '@/components/streak-badge';
+import { CATEGORY_COLORS } from '@/constants/category-colors';
 import { useAppSession } from '@/contexts/app-session';
+
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+}
 
 export default function HomeScreen() {
   const {
     currentUser,
+    groupName,
     todayChallengeStatuses,
     ownActiveGoalStatuses,
     currentProgram,
@@ -32,10 +44,10 @@ export default function HomeScreen() {
   const missedCount = todayChallengeStatuses.filter((item) => item.status === 'missed').length;
   const completionWidth = `${completionRate}%` as `${number}%`;
   const primaryGoalStatus =
-    ownActiveGoalStatuses.find((item) => item.goalId === currentProgram.id) ??
+    ownActiveGoalStatuses.find((item) => item.goalId === currentProgram?.id) ??
     ownActiveGoalStatuses[0] ??
     null;
-  const secondaryGoalStatuses = ownActiveGoalStatuses.filter((item) => item.goalId !== currentProgram.id);
+  const secondaryGoalStatuses = ownActiveGoalStatuses.filter((item) => item.goalId !== currentProgram?.id);
   const firstName = currentUser?.name.split(' ')[0] ?? 'there';
   const latestCheckInLabel = latestCheckInDate
     ? new Date(`${latestCheckInDate}T12:00:00`).toLocaleDateString(undefined, {
@@ -50,6 +62,10 @@ export default function HomeScreen() {
   const dayRingSubLabel =
     completionPercentToday === 100 ? `${completedGoalsToday}/${totalActiveGoals}` : `${completedGoalsToday}/${totalActiveGoals}`;
   const pendingGoals = ownActiveGoalStatuses.filter((goal) => goal.status === 'pending');
+  // Snapchat-style streak-at-risk nudge: only worth showing once there's an
+  // actual streak to lose, and only later in the day so it doesn't nag
+  // first thing in the morning.
+  const isStreakAtRisk = !hasCheckedInToday && currentStreak > 0 && new Date().getHours() >= 18;
 
   function openPrimaryCheckIn() {
     if (!primaryGoalStatus) {
@@ -70,22 +86,64 @@ export default function HomeScreen() {
     });
   }
 
+  if (!currentProgram || !todayCheckIn) {
+    return (
+      <ScreenContainer>
+        <View style={styles.header}>
+          <View style={styles.headerText}>
+            <Text style={styles.greeting}>
+              {getGreeting()}, {firstName}
+            </Text>
+            <Text style={styles.headerCaption}>Add a goal to start your first streak.</Text>
+          </View>
+          <Pressable onPress={() => router.push('/(tabs)/profile')}>
+            <Avatar name={currentUser?.name ?? 'You'} size={40} />
+          </Pressable>
+        </View>
+        <EmptyState
+          icon="flag"
+          title="Pick your first goal"
+          text="Open Goal Management to add a goal and unlock check-ins."
+          actionLabel="Open Goal Management"
+          onAction={() => router.push('/(tabs)/goals')}
+        />
+      </ScreenContainer>
+    );
+  }
+
+  const categoryColor = CATEGORY_COLORS[currentProgram.category];
+
   return (
     <ScreenContainer>
       <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Good evening, {firstName}</Text>
-          <Text style={styles.headerCaption}>Stay consistent today. Your group is already moving.</Text>
+        <View style={styles.headerText}>
+          <Text style={styles.greeting}>
+            {getGreeting()}, {firstName}
+          </Text>
+          <Text style={styles.headerCaption}>
+            {groupName ? 'Stay consistent today. Your group is already moving.' : 'Stay consistent today.'}
+          </Text>
         </View>
-        <View style={styles.dayPill}>
-          <Text style={styles.dayPillText}>Today {completedGoalsToday}/{totalActiveGoals}</Text>
+        <View style={styles.headerActions}>
+          <View style={styles.dayPill}>
+            <Text style={styles.dayPillText}>{completedGoalsToday}/{totalActiveGoals}</Text>
+          </View>
+          <Pressable onPress={() => router.push('/(tabs)/profile')}>
+            <Avatar name={currentUser?.name ?? 'You'} size={40} />
+          </Pressable>
         </View>
       </View>
 
       <Pressable onPress={openPrimaryCheckIn} style={({ pressed }) => [styles.programCard, pressed && styles.buttonPressed]}>
-        <Text style={styles.programEyebrow}>Primary Program</Text>
+        <View style={styles.programEyebrowRow}>
+          <Text style={styles.programEyebrow}>Primary Program</Text>
+          <StreakBadge days={currentStreak} size="small" />
+        </View>
         <Text style={styles.programTitle}>{currentProgram.title}</Text>
-        <Text style={styles.programCategory}>{currentProgram.categoryLabel}</Text>
+        <View style={styles.programCategoryRow}>
+          <View style={[styles.programCategoryDot, { backgroundColor: categoryColor.accent }]} />
+          <Text style={styles.programCategory}>{currentProgram.categoryLabel}</Text>
+        </View>
         <Text style={styles.programSubtitle}>{currentProgram.focus}</Text>
 
         <View style={styles.progressRow}>
@@ -108,6 +166,18 @@ export default function HomeScreen() {
           </View>
         ) : null}
       </Pressable>
+
+      {isStreakAtRisk ? (
+        <Pressable
+          onPress={openPrimaryCheckIn}
+          style={({ pressed }) => [styles.streakRiskBanner, pressed && styles.buttonPressed]}>
+          <Text style={styles.streakRiskEmoji}>⏳</Text>
+          <View style={styles.streakRiskTextWrap}>
+            <Text style={styles.streakRiskTitle}>Your {currentStreak}-day streak ends at midnight</Text>
+            <Text style={styles.streakRiskText}>Check in now to keep it alive.</Text>
+          </View>
+        </Pressable>
+      ) : null}
 
       <View style={styles.todayCard}>
         <View style={styles.todayTopRow}>
@@ -268,84 +338,101 @@ export default function HomeScreen() {
         <Text style={styles.coachText}>{aiCoachMessage.body}</Text>
       </View>
 
-      <View style={styles.groupCard}>
-        <View style={styles.groupHeader}>
-          <Text style={styles.groupTitle}>Group Status</Text>
-          <Text style={styles.groupMeta}>{currentUser?.groupName ?? 'Your Group'}</Text>
-        </View>
-        <Text style={styles.groupSummary}>
-          {doneCount} done, {pendingCount} pending, {missedCount} missed across active challenges.
-        </Text>
-        <View style={styles.challengeStatusList}>
-          {todayChallengeStatuses.slice(0, 6).map((item) => (
-            <View key={item.id} style={styles.challengeStatusItem}>
-              <View
-                style={[
-                  styles.challengeStatusDot,
-                  item.status === 'done'
-                    ? styles.statusDone
-                    : item.status === 'pending'
-                      ? styles.statusPending
-                      : styles.statusMissed,
-                ]}
-              />
-              <View style={styles.challengeStatusMeta}>
-                <Text style={styles.challengeStatusUser}>{item.userName}</Text>
-                <Text style={styles.challengeStatusGoal}>{item.goalTitle}</Text>
+      {groupName ? (
+        <View style={styles.groupCard}>
+          <View style={styles.groupHeader}>
+            <Text style={styles.groupTitle}>Group Status</Text>
+            <Text style={styles.groupMeta}>{groupName}</Text>
+          </View>
+          <Text style={styles.groupSummary}>
+            {doneCount} done, {pendingCount} pending, {missedCount} missed across active challenges.
+          </Text>
+          <View style={styles.challengeStatusList}>
+            {todayChallengeStatuses.slice(0, 6).map((item) => (
+              <View key={item.id} style={styles.challengeStatusItem}>
+                <Avatar name={item.userName} size={28} />
+                <View style={styles.challengeStatusMeta}>
+                  <Text style={styles.challengeStatusUser}>{item.userName}</Text>
+                  <Text style={styles.challengeStatusGoal}>{item.goalTitle}</Text>
+                </View>
+                <Text style={styles.challengeStatusLabel}>{item.status}</Text>
               </View>
-              <Text style={styles.challengeStatusLabel}>{item.status}</Text>
-            </View>
-          ))}
+            ))}
+          </View>
+          {todayChallengeStatuses.length > 6 ? (
+            <Text style={styles.challengeStatusMore}>+{todayChallengeStatuses.length - 6} more challenge statuses</Text>
+          ) : null}
         </View>
-        {todayChallengeStatuses.length > 6 ? (
-          <Text style={styles.challengeStatusMore}>+{todayChallengeStatuses.length - 6} more challenge statuses</Text>
-        ) : null}
-      </View>
+      ) : (
+        <Pressable
+          onPress={() => router.push('/onboarding/group')}
+          style={({ pressed }) => [styles.noGroupCard, pressed && styles.buttonPressed]}>
+          <Text style={styles.groupTitle}>Not in a group yet</Text>
+          <Text style={styles.groupSummary}>Create or join a private group to share your check-ins and see others&apos; progress.</Text>
+          <Text style={styles.noGroupCta}>Create or join a group →</Text>
+        </Pressable>
+      )}
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
   header: {
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    flexDirection: 'row',
     gap: 14,
+    justifyContent: 'space-between',
+  },
+  headerText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  headerActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
   },
   greeting: {
-    color: '#0f172a',
-    fontSize: 28,
+    color: '#102a19',
+    fontSize: 24,
     fontWeight: '700',
-    letterSpacing: -0.7,
+    letterSpacing: -0.6,
   },
   headerCaption: {
     color: '#64748b',
-    fontSize: 15,
-    lineHeight: 22,
-    marginTop: 6,
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 4,
   },
   dayPill: {
     backgroundColor: '#e2e8f0',
     borderRadius: 999,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 8,
   },
   dayPillText: {
-    color: '#0f172a',
+    color: '#102a19',
     fontSize: 13,
     fontWeight: '700',
   },
   programCard: {
-    backgroundColor: '#0f172a',
+    backgroundColor: '#102a19',
     borderRadius: 28,
     padding: 22,
     gap: 12,
-    shadowColor: '#0f172a',
+    shadowColor: '#102a19',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.12,
     shadowRadius: 20,
     elevation: 3,
   },
+  programEyebrowRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
   programEyebrow: {
-    color: '#93c5fd',
+    color: '#86efac',
     fontSize: 13,
     fontWeight: '700',
     textTransform: 'uppercase',
@@ -355,6 +442,16 @@ const styles = StyleSheet.create({
     fontSize: 30,
     fontWeight: '700',
     letterSpacing: -0.8,
+  },
+  programCategoryRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
+  },
+  programCategoryDot: {
+    borderRadius: 999,
+    height: 8,
+    width: 8,
   },
   programCategory: {
     color: '#7dd3fc',
@@ -381,22 +478,48 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   progressTrack: {
-    backgroundColor: '#1e293b',
+    backgroundColor: '#164e2b',
     borderRadius: 999,
     height: 10,
     overflow: 'hidden',
   },
   progressFill: {
-    backgroundColor: '#38bdf8',
+    backgroundColor: '#facc15',
     borderRadius: 999,
     height: '100%',
+  },
+  streakRiskBanner: {
+    alignItems: 'center',
+    backgroundColor: '#fef9c3',
+    borderColor: '#fed7aa',
+    borderRadius: 20,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    padding: 16,
+  },
+  streakRiskEmoji: {
+    fontSize: 26,
+  },
+  streakRiskTextWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  streakRiskTitle: {
+    color: '#9a3412',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  streakRiskText: {
+    color: '#c2410c',
+    fontSize: 13,
   },
   todayCard: {
     backgroundColor: '#ffffff',
     borderRadius: 24,
     padding: 20,
     gap: 16,
-    shadowColor: '#0f172a',
+    shadowColor: '#102a19',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.05,
     shadowRadius: 16,
@@ -407,7 +530,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   secondaryGoalsLabel: {
-    color: '#93c5fd',
+    color: '#86efac',
     fontSize: 13,
     fontWeight: '700',
     textTransform: 'uppercase',
@@ -418,7 +541,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   secondaryGoalChip: {
-    backgroundColor: '#1e293b',
+    backgroundColor: '#164e2b',
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 7,
@@ -446,7 +569,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   todayStatus: {
-    color: '#0f172a',
+    color: '#102a19',
     fontSize: 24,
     fontWeight: '700',
     marginTop: 4,
@@ -464,12 +587,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   todayPrompt: {
-    color: '#334155',
+    color: '#2f5f3b',
     fontSize: 15,
     lineHeight: 22,
   },
   checkInButton: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#16a34a',
     borderRadius: 20,
     paddingHorizontal: 18,
     paddingVertical: 18,
@@ -486,7 +609,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   checkInButtonHint: {
-    color: '#dbeafe',
+    color: '#dcfce7',
     fontSize: 13,
     marginTop: 4,
   },
@@ -495,7 +618,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 20,
     gap: 10,
-    shadowColor: '#0f172a',
+    shadowColor: '#102a19',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.04,
     shadowRadius: 14,
@@ -552,7 +675,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   goalChecklistTitle: {
-    color: '#0f172a',
+    color: '#102a19',
     fontSize: 14,
     fontWeight: '700',
   },
@@ -595,7 +718,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   secondaryStatusTitle: {
-    color: '#0f172a',
+    color: '#102a19',
     fontSize: 20,
     fontWeight: '700',
   },
@@ -621,7 +744,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   secondaryStatusGoal: {
-    color: '#0f172a',
+    color: '#102a19',
     fontSize: 14,
     fontWeight: '700',
   },
@@ -635,13 +758,13 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   secondaryStatusLabel: {
-    color: '#334155',
+    color: '#2f5f3b',
     fontSize: 12,
     fontWeight: '700',
     textTransform: 'uppercase',
   },
   secondaryStatusButton: {
-    backgroundColor: '#0f172a',
+    backgroundColor: '#102a19',
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -656,7 +779,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 20,
     gap: 12,
-    shadowColor: '#0f172a',
+    shadowColor: '#102a19',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.04,
     shadowRadius: 14,
@@ -679,7 +802,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   latestCaption: {
-    color: '#334155',
+    color: '#2f5f3b',
     fontSize: 15,
     lineHeight: 22,
   },
@@ -692,7 +815,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   emptyTitle: {
-    color: '#0f172a',
+    color: '#102a19',
     fontSize: 18,
     fontWeight: '700',
   },
@@ -711,14 +834,14 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     padding: 18,
     gap: 8,
-    shadowColor: '#0f172a',
+    shadowColor: '#102a19',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.04,
     shadowRadius: 14,
     elevation: 1,
   },
   statValue: {
-    color: '#0f172a',
+    color: '#102a19',
     fontSize: 24,
     fontWeight: '700',
     letterSpacing: -0.4,
@@ -737,7 +860,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   coachTitle: {
-    color: '#0f172a',
+    color: '#102a19',
     fontSize: 21,
     fontWeight: '700',
     letterSpacing: -0.4,
@@ -753,11 +876,26 @@ const styles = StyleSheet.create({
     padding: 20,
     gap: 14,
     marginBottom: 12,
-    shadowColor: '#0f172a',
+    shadowColor: '#102a19',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.04,
     shadowRadius: 14,
     elevation: 1,
+  },
+  noGroupCard: {
+    backgroundColor: '#ffffff',
+    borderColor: '#e2e8f0',
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 20,
+    gap: 8,
+    marginBottom: 12,
+  },
+  noGroupCta: {
+    color: '#16a34a',
+    fontSize: 14,
+    fontWeight: '700',
+    marginTop: 4,
   },
   groupHeader: {
     alignItems: 'center',
@@ -765,7 +903,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   groupTitle: {
-    color: '#0f172a',
+    color: '#102a19',
     fontSize: 20,
     fontWeight: '700',
   },
@@ -775,7 +913,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   groupSummary: {
-    color: '#334155',
+    color: '#2f5f3b',
     fontSize: 15,
     lineHeight: 22,
   },
@@ -787,17 +925,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
   },
-  challengeStatusDot: {
-    borderRadius: 999,
-    height: 10,
-    width: 10,
-  },
   challengeStatusMeta: {
     flex: 1,
     minWidth: 0,
   },
   challengeStatusUser: {
-    color: '#0f172a',
+    color: '#102a19',
     fontSize: 14,
     fontWeight: '700',
   },
@@ -807,7 +940,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   challengeStatusLabel: {
-    color: '#334155',
+    color: '#2f5f3b',
     fontSize: 12,
     fontWeight: '700',
     textTransform: 'uppercase',
@@ -816,14 +949,5 @@ const styles = StyleSheet.create({
     color: '#64748b',
     fontSize: 12,
     fontWeight: '600',
-  },
-  statusDone: {
-    backgroundColor: '#22c55e',
-  },
-  statusPending: {
-    backgroundColor: '#f59e0b',
-  },
-  statusMissed: {
-    backgroundColor: '#ef4444',
   },
 });

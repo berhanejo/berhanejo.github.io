@@ -1,17 +1,27 @@
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Redirect, router } from 'expo-router';
 
 import { ScreenContainer } from '@/components/screen-container';
-import { useAppSession } from '@/contexts/app-session';
+import { Badge, Button, Card, Chip, SectionHeader } from '@/components/ui';
+import { colors, spacing, typography } from '@/constants/tokens';
 import { categoryOptions, programsByCategory } from '@/data/mock-data';
+import { getErrorMessage } from '@/lib/error-message';
+import { useCreateGoal } from '@/lib/queries/goals';
+import { useCompleteOnboarding } from '@/lib/queries/profile';
+import { useAppStore } from '@/stores/app-store';
+import { useOnboardingStore } from '@/stores/onboarding-store';
 
 export default function ProgramScreen() {
-  const {
-    selectedCategories,
-    selectedPrograms,
-    toggleProgram,
-    completeOnboarding,
-  } = useAppSession();
+  const selectedCategories = useOnboardingStore((state) => state.selectedCategories);
+  const selectedPrograms = useOnboardingStore((state) => state.selectedPrograms);
+  const toggleProgram = useOnboardingStore((state) => state.toggleProgram);
+  const resetOnboarding = useOnboardingStore((state) => state.reset);
+  const maxActivePrograms = useAppStore((state) => state.maxActivePrograms);
+  const createGoal = useCreateGoal();
+  const completeOnboarding = useCompleteOnboarding();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   if (!selectedCategories.length) {
     return <Redirect href="/onboarding/category" />;
@@ -22,9 +32,28 @@ export default function ProgramScreen() {
     .map((category) => categoryOptions.find((option) => option.id === category)?.label)
     .filter(Boolean) as string[];
 
-  function handleContinue() {
-    completeOnboarding();
-    router.replace('/(tabs)');
+  async function handleContinue() {
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      for (const [index, program] of selectedPrograms.entries()) {
+        await createGoal.mutateAsync({
+          category: program.category,
+          title: program.title,
+          durationDays: program.totalDays,
+          isCustom: false,
+          isActive: index < maxActivePrograms,
+        });
+      }
+      await completeOnboarding.mutateAsync();
+      resetOnboarding();
+      router.replace('/(tabs)');
+    } catch (submitError) {
+      console.warn('Failed to finish onboarding:', submitError);
+      setError(getErrorMessage(submitError, 'Something went wrong finishing setup. Please try again.'));
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -35,21 +64,17 @@ export default function ProgramScreen() {
         </Pressable>
       </View>
 
-      <View style={styles.header}>
-        <Text style={styles.kicker}>Step 2</Text>
-        <Text style={styles.title}>Choose suggested goals</Text>
-        <Text style={styles.subtitle}>
-          Based on your focus areas, here are mock programs you can start with. Choose one or more, or skip for now.
-        </Text>
-      </View>
+      <SectionHeader
+        eyebrow="Step 3"
+        title="Choose suggested goals"
+        subtitle="Based on your focus areas, here are suggested programs you can start with. Choose one or more, or skip for now."
+      />
 
-      <View style={styles.summaryCard}>
+      <Card variant="soft" style={styles.summaryCard}>
         <Text style={styles.summaryTitle}>Suggested for your focus</Text>
         <View style={styles.chipRow}>
           {selectedLabels.map((label) => (
-            <View key={label} style={styles.chip}>
-              <Text style={styles.chipText}>{label}</Text>
-            </View>
+            <Chip key={label} label={label} selected />
           ))}
         </View>
         <Text style={styles.summaryText}>
@@ -57,42 +82,42 @@ export default function ProgramScreen() {
             ? `${selectedPrograms.length} goal${selectedPrograms.length === 1 ? '' : 's'} selected. You can add more later.`
             : 'No goal selected yet. You can continue now and manage goals later from the app.'}
         </Text>
-      </View>
+      </Card>
 
       <View style={styles.list}>
         {programs.map((program) => {
           const isSelected = selectedPrograms.some((entry) => entry.id === program.id);
 
           return (
-            <Pressable
+            <Card
               key={program.id}
-              onPress={() => toggleProgram(program)}
               style={[styles.card, isSelected && styles.cardSelected]}>
-              <View style={styles.cardTitleRow}>
-                <Text style={[styles.cardTitle, isSelected && styles.cardTitleSelected]}>{program.title}</Text>
-                <Text style={[styles.stateBadge, isSelected ? styles.stateBadgeSelected : styles.stateBadgeIdle]}>
-                  {isSelected ? 'Selected' : 'Optional'}
+              <Pressable onPress={() => toggleProgram(program)} style={styles.cardPressArea}>
+                <View style={styles.cardTitleRow}>
+                  <Text style={[styles.cardTitle, isSelected && styles.cardTitleSelected]}>{program.title}</Text>
+                  <Badge label={isSelected ? 'Selected' : 'Optional'} tone={isSelected ? 'brand' : 'neutral'} />
+                </View>
+                <Text style={[styles.cardMeta, isSelected && styles.cardMetaSelected]}>
+                  {program.categoryLabel} • {program.totalDays} days
                 </Text>
-              </View>
-              <Text style={[styles.cardMeta, isSelected && styles.cardMetaSelected]}>
-                {program.categoryLabel} • {program.totalDays} days
-              </Text>
-              <Text style={[styles.cardText, isSelected && styles.cardTextSelected]}>{program.focus}</Text>
-            </Pressable>
+                <Text style={[styles.cardText, isSelected && styles.cardTextSelected]}>{program.focus}</Text>
+              </Pressable>
+            </Card>
           );
         })}
       </View>
 
-      <View style={styles.footerActions}>
-        <Pressable style={styles.secondaryButton} onPress={handleContinue}>
-          <Text style={styles.secondaryButtonText}>Skip for now</Text>
-        </Pressable>
+      {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        <Pressable style={styles.primaryButton} onPress={handleContinue}>
-          <Text style={styles.primaryButtonText}>
-            {selectedPrograms.length > 0 ? 'Continue with selected goals' : 'Continue without goals'}
-          </Text>
-        </Pressable>
+      <View style={styles.footerActions}>
+        <Button disabled={isSubmitting} label="Skip for now" onPress={handleContinue} variant="secondary" />
+
+        <Button
+          disabled={isSubmitting}
+          loading={isSubmitting}
+          label={selectedPrograms.length > 0 ? 'Continue with selected goals' : 'Continue without goals'}
+          onPress={handleContinue}
+        />
       </View>
     </ScreenContainer>
   );
@@ -103,81 +128,43 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   backButton: {
-    borderColor: '#cbd5e1',
+    borderColor: colors.slate[300],
     borderRadius: 999,
     borderWidth: 1,
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
   backButtonText: {
-    color: '#1e293b',
+    color: colors.ink,
     fontSize: 14,
     fontWeight: '600',
   },
-  header: {
-    gap: 6,
-    paddingHorizontal: 4,
-  },
-  kicker: {
-    color: '#64748b',
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
-  },
-  title: {
-    color: '#0f172a',
-    fontSize: 30,
-    fontWeight: '700',
-    letterSpacing: -0.8,
-  },
-  subtitle: {
-    color: '#475569',
-    fontSize: 15,
-    lineHeight: 22,
-  },
   list: {
-    gap: 12,
+    gap: spacing.md,
   },
   summaryCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 22,
     gap: 10,
-    padding: 18,
   },
   summaryTitle: {
-    color: '#0f172a',
+    color: colors.ink,
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   summaryText: {
-    color: '#64748b',
-    fontSize: 14,
-    lineHeight: 20,
+    ...typography.body,
+    color: colors.slate[600],
   },
   chipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
   },
-  chip: {
-    backgroundColor: '#eff6ff',
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-  },
-  chipText: {
-    color: '#1d4ed8',
-    fontSize: 12,
-    fontWeight: '700',
-  },
   card: {
-    backgroundColor: '#ffffff',
-    borderColor: '#e2e8f0',
-    borderRadius: 24,
-    borderWidth: 1.5,
-    gap: 8,
-    padding: 20,
+    padding: 0,
+  },
+  cardPressArea: {
+    gap: spacing.sm,
+    padding: spacing.xl,
   },
   cardTitleRow: {
     alignItems: 'center',
@@ -186,75 +173,41 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   cardSelected: {
-    backgroundColor: '#eff6ff',
-    borderColor: '#2563eb',
+    backgroundColor: colors.primary.tint,
+    borderColor: colors.primary.text,
   },
   cardTitle: {
-    color: '#0f172a',
+    color: colors.ink,
     fontSize: 20,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   cardTitleSelected: {
-    color: '#1d4ed8',
-  },
-  stateBadge: {
-    borderRadius: 999,
-    fontSize: 12,
-    fontWeight: '700',
-    overflow: 'hidden',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  stateBadgeSelected: {
-    backgroundColor: '#dbeafe',
-    color: '#1d4ed8',
-  },
-  stateBadgeIdle: {
-    backgroundColor: '#f1f5f9',
-    color: '#64748b',
+    color: colors.primary.darker,
   },
   cardMeta: {
-    color: '#2563eb',
+    color: colors.primary.dark,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   cardMetaSelected: {
-    color: '#1d4ed8',
+    color: colors.primary.darker,
   },
   cardText: {
-    color: '#64748b',
-    fontSize: 14,
-    lineHeight: 20,
+    ...typography.body,
+    color: colors.slate[600],
   },
   cardTextSelected: {
-    color: '#1e40af',
+    color: colors.primary.darker,
+  },
+  error: {
+    color: colors.danger.text,
+    fontSize: 13,
+    fontWeight: '600',
+    paddingHorizontal: 4,
+    textAlign: 'center',
   },
   footerActions: {
     gap: 10,
     marginTop: 8,
-  },
-  secondaryButton: {
-    backgroundColor: '#e2e8f0',
-    borderRadius: 22,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
-  secondaryButtonText: {
-    color: '#0f172a',
-    fontSize: 16,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  primaryButton: {
-    backgroundColor: '#2563eb',
-    borderRadius: 22,
-    paddingHorizontal: 20,
-    paddingVertical: 18,
-  },
-  primaryButtonText: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '700',
-    textAlign: 'center',
   },
 });

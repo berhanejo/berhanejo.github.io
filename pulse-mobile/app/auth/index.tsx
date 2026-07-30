@@ -1,13 +1,19 @@
 import { useEffect, useState } from 'react';
 import { Redirect } from 'expo-router';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text } from 'react-native';
 
 import { ScreenContainer } from '@/components/screen-container';
+import { Button, Card, SectionHeader, TextField } from '@/components/ui';
+import { colors, spacing, typography } from '@/constants/tokens';
 import { useAuthSession } from '@/contexts/auth-session';
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+type Mode = 'signIn' | 'signUp' | 'forgotPassword';
+
 export default function AuthScreen() {
-  const { session, signIn, signUp } = useAuthSession();
-  const [mode, setMode] = useState<'signIn' | 'signUp'>('signIn');
+  const { session, signIn, signUp, requestPasswordReset } = useAuthSession();
+  const [mode, setMode] = useState<Mode>('signIn');
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -26,11 +32,36 @@ export default function AuthScreen() {
     return <Redirect href="/" />;
   }
 
+  function switchMode(nextMode: Mode) {
+    setMode(nextMode);
+    setPassword('');
+    setMessage(null);
+  }
+
   async function handleSubmit() {
-    if (!email.trim() || !password) {
-      setMessage('Please enter email and password.');
+    const cleanedEmail = email.trim();
+
+    if (!cleanedEmail || !EMAIL_PATTERN.test(cleanedEmail)) {
+      setMessage('Enter a valid email address.');
       return;
     }
+
+    if (mode === 'forgotPassword') {
+      setIsSubmitting(true);
+      setMessage(null);
+      const result = await requestPasswordReset(cleanedEmail);
+      setIsSubmitting(false);
+      setMessage(
+        result.error ?? 'If an account exists for that email, a reset link is on its way — check your inbox.'
+      );
+      return;
+    }
+
+    if (password.length < 6) {
+      setMessage('Password must be at least 6 characters.');
+      return;
+    }
+
     if (mode === 'signUp' && !displayName.trim()) {
       setMessage('Please enter your name.');
       return;
@@ -40,9 +71,7 @@ export default function AuthScreen() {
     setMessage(null);
 
     const result =
-      mode === 'signIn'
-        ? await signIn(email, password)
-        : await signUp(email, password, displayName);
+      mode === 'signIn' ? await signIn(cleanedEmail, password) : await signUp(cleanedEmail, password, displayName);
 
     if (result.error) {
       setMessage(result.error);
@@ -53,149 +82,91 @@ export default function AuthScreen() {
     setIsSubmitting(false);
   }
 
+  const titles: Record<Mode, string> = {
+    signIn: 'Welcome back',
+    signUp: 'Create your account',
+    forgotPassword: 'Reset your password',
+  };
+  const ctaLabels: Record<Mode, string> = {
+    signIn: 'Sign In',
+    signUp: 'Sign Up',
+    forgotPassword: 'Send reset link',
+  };
+
   return (
     <ScreenContainer>
-      <View style={styles.header}>
-        <Text style={styles.kicker}>Pulse</Text>
-        <Text style={styles.title}>{mode === 'signIn' ? 'Welcome back' : 'Create your account'}</Text>
-        <Text style={styles.subtitle}>Sign in to sync goals, check-ins, and progress with Supabase.</Text>
-      </View>
+      <SectionHeader
+        eyebrow="Pulse"
+        title={titles[mode]}
+        subtitle={
+          mode === 'forgotPassword'
+            ? "Enter your account email and we'll send you a link to set a new password."
+            : 'Sign in to keep your streaks, proof, and private group in sync.'
+        }
+      />
 
-      <View style={styles.formCard}>
+      <Card style={styles.formCard}>
         {mode === 'signUp' ? (
-          <>
-            <Text style={styles.label}>Name</Text>
-            <TextInput
-              autoCapitalize="words"
-              onChangeText={setDisplayName}
-              placeholder="Your name"
-              placeholderTextColor="#94a3b8"
-              style={styles.input}
-              value={displayName}
-            />
-          </>
+          <TextField autoCapitalize="words" label="Name" onChangeText={setDisplayName} placeholder="Your name" value={displayName} />
         ) : null}
 
-        <Text style={styles.label}>Email</Text>
-        <TextInput
+        <TextField
           autoCapitalize="none"
           keyboardType="email-address"
+          label="Email"
           onChangeText={setEmail}
           placeholder="you@example.com"
-          placeholderTextColor="#94a3b8"
-          style={styles.input}
           value={email}
         />
 
-        <Text style={styles.label}>Password</Text>
-        <TextInput
-          onChangeText={setPassword}
-          placeholder="Minimum 6 characters"
-          placeholderTextColor="#94a3b8"
-          secureTextEntry
-          style={styles.input}
-          value={password}
-        />
+        {mode !== 'forgotPassword' ? (
+          <TextField
+            label="Password"
+            onChangeText={setPassword}
+            placeholder="Minimum 6 characters"
+            secureTextEntry
+            value={password}
+          />
+        ) : null}
 
-        <Pressable disabled={isSubmitting} onPress={handleSubmit} style={styles.primaryButton}>
-          <Text style={styles.primaryButtonText}>
-            {isSubmitting ? 'Please wait…' : mode === 'signIn' ? 'Sign In' : 'Sign Up'}
-          </Text>
-        </Pressable>
+        {mode === 'signIn' ? (
+          <Pressable onPress={() => switchMode('forgotPassword')} style={styles.forgotPasswordButton}>
+            <Text style={styles.forgotPasswordText}>Forgot password?</Text>
+          </Pressable>
+        ) : null}
 
-        <Pressable
-          onPress={() => {
-            setMode((prev) => (prev === 'signIn' ? 'signUp' : 'signIn'));
-            setDisplayName('');
-            setPassword('');
-            setMessage(null);
-          }}
-          style={styles.secondaryButton}>
-          <Text style={styles.secondaryButtonText}>
-            {mode === 'signIn' ? 'Need an account? Sign Up' : 'Already have an account? Sign In'}
-          </Text>
-        </Pressable>
+        <Button loading={isSubmitting} label={ctaLabels[mode]} onPress={handleSubmit} />
+
+        {mode === 'forgotPassword' ? (
+          <Button label="Back to Sign In" onPress={() => switchMode('signIn')} variant="secondary" />
+        ) : (
+          <Button
+            label={mode === 'signIn' ? 'Need an account? Sign Up' : 'Already have an account? Sign In'}
+            onPress={() => switchMode(mode === 'signIn' ? 'signUp' : 'signIn')}
+            variant="secondary"
+          />
+        )}
 
         {message ? <Text style={styles.message}>{message}</Text> : null}
-      </View>
+      </Card>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    gap: 6,
-    paddingHorizontal: 4,
-  },
-  kicker: {
-    color: '#64748b',
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
-  },
-  title: {
-    color: '#0f172a',
-    fontSize: 30,
-    fontWeight: '700',
-    letterSpacing: -0.8,
-  },
-  subtitle: {
-    color: '#475569',
-    fontSize: 15,
-    lineHeight: 22,
-  },
   formCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 24,
-    gap: 12,
-    padding: 20,
+    gap: spacing.md,
   },
-  label: {
-    color: '#334155',
+  forgotPasswordButton: {
+    alignSelf: 'flex-end',
+  },
+  forgotPasswordText: {
+    color: colors.primary.dark,
     fontSize: 13,
-    fontWeight: '700',
-    marginTop: 4,
-    textTransform: 'uppercase',
-  },
-  input: {
-    backgroundColor: '#f8fafc',
-    borderColor: '#e2e8f0',
-    borderRadius: 14,
-    borderWidth: 1,
-    color: '#0f172a',
-    fontSize: 15,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  primaryButton: {
-    backgroundColor: '#2563eb',
-    borderRadius: 14,
-    marginTop: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  primaryButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  secondaryButton: {
-    backgroundColor: '#e2e8f0',
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  secondaryButtonText: {
-    color: '#0f172a',
-    fontSize: 14,
-    fontWeight: '700',
-    textAlign: 'center',
+    fontWeight: '800',
   },
   message: {
-    color: '#1e293b',
-    fontSize: 13,
-    lineHeight: 18,
+    ...typography.body,
+    color: colors.slate[700],
   },
 });

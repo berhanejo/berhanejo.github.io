@@ -1,5 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
+import { colors, radii } from '@/constants/tokens';
+
 type ProgressRingProps = {
   progress: number;
   size?: number;
@@ -44,7 +46,7 @@ export function ProgressRing({
                 left: x,
                 top: y,
                 transform: [{ rotate: `${angleDegrees + 90}deg` }],
-                backgroundColor: isActive ? '#2563eb' : '#dbeafe',
+                backgroundColor: isActive ? colors.primary.text : colors.primary.lighter,
               },
             ]}
           />
@@ -65,7 +67,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   segment: {
-    borderRadius: 999,
+    borderRadius: radii.pill,
     position: 'absolute',
   },
   center: {
@@ -73,13 +75,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   centerLabel: {
-    color: '#0f172a',
+    color: colors.ink,
     fontSize: 20,
     fontWeight: '700',
     letterSpacing: -0.4,
   },
   centerSubLabel: {
-    color: '#64748b',
+    color: colors.slate[500],
     fontSize: 11,
     fontWeight: '700',
     marginTop: 2,

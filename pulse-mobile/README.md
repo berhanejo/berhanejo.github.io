@@ -1,50 +1,98 @@
-# Welcome to your Expo app 👋
+# Pulse
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Pulse helps people consistently work toward personal goals. Users pick goals
+(fitness, learning, reading, mindset), do daily check-ins with photo proof,
+and stay accountable through a small private group.
 
-## Get started
+Built with Expo Router, React Native, Supabase (auth, Postgres, storage,
+realtime), and React Query.
 
-1. Install dependencies
+## Requirements
+
+- Node.js **20.19.4 or newer** (Expo SDK 54 / Metro requires it — `expo start`
+  will crash on Node 18 with a `configs.toReversed is not a function` error).
+- A Supabase project (free tier is fine).
+
+## Setup
+
+1. Install dependencies:
 
    ```bash
    npm install
    ```
 
-2. Start the app
+2. Create a Supabase project, then in the SQL Editor run the contents of
+   [`supabase/schema.sql`](./supabase/schema.sql). This creates all tables
+   (`profiles`, `groups`, `group_members`, `group_invites`, `goals`,
+   `check_ins`, `reactions`), RLS policies, helper functions, and the private
+   `check-in-photos` storage bucket.
+
+3. Copy `.env.example` to `.env` and fill in your Supabase project URL and
+   anon key:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+4. Start the app:
 
    ```bash
    npx expo start
    ```
 
-In the output, you'll find options to open the app in a
+## GitHub Pages deployment
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+The GitHub Pages version must be rebuilt after app changes. Otherwise the live
+site can still run an older JavaScript bundle even when the source code was
+committed.
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+Expo puts the web JavaScript bundle into `_expo/`. GitHub Pages must receive a
+`.nojekyll` file with the build, otherwise that underscore folder can be skipped
+and the site stays stuck on the loading screen.
 
-## Get a fresh project
+Recommended setup:
 
-When you're ready, run:
+1. In GitHub, add these repository secrets:
 
-```bash
-npm run reset-project
-```
+   ```text
+   EXPO_PUBLIC_SUPABASE_URL
+   EXPO_PUBLIC_SUPABASE_ANON_KEY
+   ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+2. In GitHub Pages settings, use GitHub Actions as the publishing source.
 
-## Learn more
+3. Push to `main`. The workflow at
+   `.github/workflows/deploy-pages.yml` builds `pulse-mobile/dist`, adds
+   `.nojekyll`, and deploys that artifact to Pages.
 
-To learn more about developing your project with Expo, look at the following resources:
+Local/manual build:
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+1. Build the static web app:
 
-## Join the community
+   ```bash
+   npm run export:web
+   ```
 
-Join our community of developers creating universal apps.
+2. Commit the source changes and the generated `dist/` files if you deploy
+   manually without the GitHub Action.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+3. Push to `main`, then wait for GitHub Pages to refresh. A hard refresh on the
+   phone/browser may be needed because the old bundle can be cached.
+
+## Project structure
+
+- `app/` — Expo Router screens: `auth/`, `onboarding/` (welcome → group →
+  category → program), `(tabs)/` (home, group, check-in, progress, goals,
+  profile), `group/invite` (modal).
+- `contexts/` — `auth-session` (Supabase auth) and `app-session` (composes
+  the query hooks + derive functions below into the shape screens consume).
+- `lib/queries/` — React Query hooks for groups, goals, check-ins, reactions,
+  and profile, all backed by Supabase.
+- `lib/derive/` — pure functions for streaks, week view, and coach messages.
+- `lib/realtime/` — Supabase Realtime subscription for live group updates.
+- `data/mock-data.ts` — the static goal catalog (categories + suggested
+  programs), not user data.
+- `stores/` — device-local UI state only (zustand): active-goal-limit /
+  primary-goal preference, and the onboarding wizard's in-progress selection.
+- `supabase/schema.sql` — full database schema, RLS policies, and storage
+  bucket setup.

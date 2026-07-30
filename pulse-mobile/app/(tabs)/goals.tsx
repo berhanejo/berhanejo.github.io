@@ -4,7 +4,13 @@ import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-nativ
 
 import { ScreenContainer } from '@/components/screen-container';
 import { useAppSession } from '@/contexts/app-session';
-import { Program } from '@/data/mock-data';
+
+type GoalCardProgram = {
+  id: string;
+  groupId: string | null;
+  title: string;
+  categoryLabel: string;
+};
 
 function GoalCard({
   program,
@@ -13,19 +19,25 @@ function GoalCard({
   onSetPrimary,
   onToggleActive,
   onResetProgress,
+  onCopyToGroup,
   canSetPrimary,
   canActivateMore,
   maxActivePrograms,
+  groupName,
+  copyTargets,
 }: {
-  program: Program;
+  program: GoalCardProgram;
   statusLabel: 'active' | 'paused';
   primary: boolean;
   onSetPrimary: () => void;
   onToggleActive: () => void;
   onResetProgress: () => void;
+  onCopyToGroup: (groupId: string) => void;
   canSetPrimary: boolean;
   canActivateMore: boolean;
   maxActivePrograms: number;
+  groupName: string | null;
+  copyTargets: { id: string; name: string }[];
 }) {
   const isActive = statusLabel === 'active';
   const primaryDisabled = primary || !canSetPrimary;
@@ -39,7 +51,7 @@ function GoalCard({
           {primary ? 'Primary' : statusLabel}
         </Text>
       </View>
-      <Text style={styles.goalMeta}>{program.categoryLabel}</Text>
+      <Text style={styles.goalMeta}>{program.categoryLabel} • {groupName ?? 'Private'}</Text>
 
       <View style={styles.goalActions}>
         <Pressable
@@ -69,6 +81,22 @@ function GoalCard({
         </Pressable>
       </View>
 
+      {!program.groupId && copyTargets.length > 0 ? (
+        <View style={styles.copyRow}>
+          <Text style={styles.copyLabel}>Copy into group</Text>
+          <View style={styles.copyTargets}>
+            {copyTargets.map((group) => (
+              <Pressable
+                key={group.id}
+                onPress={() => onCopyToGroup(group.id)}
+                style={({ pressed }) => [styles.copyChip, pressed && styles.buttonPressed]}>
+                <Text style={styles.copyChipText}>{group.name}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
       {!isActive && !canActivateMore ? (
         <Text style={styles.goalHint}>Max {maxActivePrograms} active goals reached. Pause one active goal first.</Text>
       ) : null}
@@ -90,10 +118,13 @@ export default function GoalsScreen() {
     setPrimaryProgram,
     pauseProgram,
     resetGoalProgress,
+    groupSummaries,
+    copyGoalToGroup,
   } = useAppSession();
   const [customTitle, setCustomTitle] = useState('');
   const [customCategory, setCustomCategory] = useState<'fitness' | 'learning' | 'reading' | 'mindset'>('fitness');
   const [customDuration, setCustomDuration] = useState<7 | 14 | 30>(14);
+  const [customTargetGroupId, setCustomTargetGroupId] = useState<string | null>(null);
 
   const activeProgramIds = useMemo(() => new Set(activePrograms.map((program) => program.id)), [activePrograms]);
   const pausedPrograms = useMemo(
@@ -103,11 +134,30 @@ export default function GoalsScreen() {
   const canActivateMore = activePrograms.length < maxActivePrograms;
   const handleBack = useCallback(() => router.back(), []);
   const canCreateCustom = customTitle.trim().length > 0;
+  const groupNameById = useMemo(
+    () => new Map(groupSummaries.map((group) => [group.id, group.name])),
+    [groupSummaries]
+  );
+  const copyTargets = useMemo(
+    () => groupSummaries.filter((group) => group.role === 'owner').map((group) => ({ id: group.id, name: group.name })),
+    [groupSummaries]
+  );
+  const ownedGroupSummaries = useMemo(
+    () => groupSummaries.filter((group) => group.role === 'owner'),
+    [groupSummaries]
+  );
+  const targetOptions = useMemo(
+    () => [
+      { id: 'private', label: 'Private', groupId: null },
+      ...ownedGroupSummaries.map((group) => ({ id: group.id, label: group.name, groupId: group.id })),
+    ],
+    [ownedGroupSummaries]
+  );
   const confirmResetGoal = useCallback(
-    (program: Program) => {
+    (program: GoalCardProgram) => {
       Alert.alert(
         'Restart challenge?',
-        `This resets "${program.title}" to 0. Streak and progress stats are cleared, and your previous check-ins for this goal are removed.`,
+        `This resets "${program.title}" to day 0. Streak and progress stats start over, but your past check-ins for this goal are kept in your history.`,
         [
           { text: 'Cancel', style: 'cancel' },
           {
@@ -130,11 +180,13 @@ export default function GoalsScreen() {
       title: customTitle,
       category: customCategory,
       durationDays: customDuration,
-    });
+      groupId: customTargetGroupId,
+    }).catch((error) => console.warn('Failed to create custom challenge:', error));
     setCustomTitle('');
     setCustomCategory('fitness');
     setCustomDuration(14);
-  }, [canCreateCustom, createCustomChallenge, customCategory, customDuration, customTitle]);
+    setCustomTargetGroupId(null);
+  }, [canCreateCustom, createCustomChallenge, customCategory, customDuration, customTargetGroupId, customTitle]);
 
   return (
     <ScreenContainer compactTop>
@@ -154,7 +206,7 @@ export default function GoalsScreen() {
 
       <View style={styles.summaryCard}>
         <View style={[styles.summaryChip, styles.summaryChipPrimary]}>
-          <Text style={styles.summaryValue}>{currentProgram.title}</Text>
+          <Text style={styles.summaryValue}>{currentProgram?.title ?? 'No primary goal yet'}</Text>
           <Text style={styles.summaryLabel}>Primary</Text>
         </View>
         <View style={styles.summaryRow}>
@@ -194,13 +246,16 @@ export default function GoalsScreen() {
               key={program.id}
               program={program}
               statusLabel="active"
-              primary={currentProgram.id === program.id}
+              primary={currentProgram?.id === program.id}
               canSetPrimary
               canActivateMore={canActivateMore}
               maxActivePrograms={maxActivePrograms}
               onSetPrimary={() => setPrimaryProgram(program.id)}
               onToggleActive={() => pauseProgram(program.id)}
               onResetProgress={() => confirmResetGoal(program)}
+              onCopyToGroup={(groupId) => copyGoalToGroup(program.id, groupId)}
+              groupName={program.groupId ? groupNameById.get(program.groupId) ?? 'Group' : null}
+              copyTargets={copyTargets}
             />
           ))}
         </View>
@@ -227,6 +282,9 @@ export default function GoalsScreen() {
               onSetPrimary={() => setPrimaryProgram(program.id)}
               onToggleActive={() => setProgramActive(program.id)}
               onResetProgress={() => confirmResetGoal(program)}
+              onCopyToGroup={(groupId) => copyGoalToGroup(program.id, groupId)}
+              groupName={program.groupId ? groupNameById.get(program.groupId) ?? 'Group' : null}
+              copyTargets={copyTargets}
             />
           ))}
         </View>
@@ -278,6 +336,32 @@ export default function GoalsScreen() {
             </Pressable>
           ))}
         </View>
+        <View style={styles.targetBlock}>
+          <Text style={styles.copyLabel}>Goal location</Text>
+          {ownedGroupSummaries.length === 0 ? (
+            <Text style={styles.goalHint}>Only group creators can add goals to a group. Your challenge will stay private.</Text>
+          ) : null}
+          <View style={styles.targetSelector}>
+            {targetOptions.map((target) => {
+              const isSelected = customTargetGroupId === target.groupId;
+
+              return (
+                <Pressable
+                  key={target.id}
+                  onPress={() => setCustomTargetGroupId(target.groupId)}
+                  style={({ pressed }) => [
+                    styles.targetChip,
+                    isSelected && styles.targetChipActive,
+                    pressed && styles.buttonPressed,
+                  ]}>
+                  <Text style={[styles.targetChipText, isSelected && styles.targetChipTextActive]}>
+                    {target.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
         <Pressable
           disabled={!canCreateCustom}
           onPress={handleCreateCustom}
@@ -299,11 +383,28 @@ export default function GoalsScreen() {
                 <Text style={[styles.goalState, styles.goalStatePaused]}>Available</Text>
               </View>
               <Text style={styles.goalMeta}>{program.categoryLabel}</Text>
-              <Pressable
-                onPress={() => addGoal(program)}
-                style={({ pressed }) => [styles.goalActionPrimary, pressed && styles.buttonPressed]}>
-                <Text style={styles.goalActionPrimaryText}>Add goal</Text>
-              </Pressable>
+              <View style={styles.addTargetRow}>
+                <Pressable
+                  onPress={() => addGoal(program, null).catch((error) => console.warn('Failed to add goal:', error))}
+                  style={({ pressed }) => [styles.goalActionPrimary, pressed && styles.buttonPressed]}>
+                  <Text style={styles.goalActionPrimaryText}>Add private</Text>
+                </Pressable>
+                {groupSummaries.map((group) => (
+                  group.role === 'owner' ? (
+                    <Pressable
+                      key={group.id}
+                      onPress={() =>
+                        addGoal(program, group.id).catch((error) => console.warn('Failed to add group goal:', error))
+                      }
+                      style={({ pressed }) => [styles.goalActionSecondary, pressed && styles.buttonPressed]}>
+                      <Text style={styles.goalActionSecondaryText}>{group.name}</Text>
+                    </Pressable>
+                  ) : null
+                ))}
+              </View>
+              {ownedGroupSummaries.length === 0 ? (
+                <Text style={styles.goalHint}>Group goals can only be added by the group creator.</Text>
+              ) : null}
             </View>
           ))}
         </View>
@@ -328,7 +429,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   backButtonText: {
-    color: '#1e293b',
+    color: '#164e2b',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -344,7 +445,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   title: {
-    color: '#0f172a',
+    color: '#102a19',
     fontSize: 30,
     fontWeight: '700',
     letterSpacing: -0.8,
@@ -372,15 +473,15 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   summaryChipPrimary: {
-    backgroundColor: '#eff6ff',
+    backgroundColor: '#f0fdf4',
   },
   summaryValue: {
-    color: '#0f172a',
+    color: '#102a19',
     fontSize: 16,
     fontWeight: '700',
   },
   summaryCount: {
-    color: '#0f172a',
+    color: '#102a19',
     fontSize: 24,
     fontWeight: '700',
   },
@@ -412,10 +513,10 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   limitChipActive: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#16a34a',
   },
   limitChipText: {
-    color: '#334155',
+    color: '#2f5f3b',
     fontSize: 12,
     fontWeight: '700',
   },
@@ -426,7 +527,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   sectionTitle: {
-    color: '#0f172a',
+    color: '#102a19',
     fontSize: 22,
     fontWeight: '700',
   },
@@ -456,7 +557,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   goalTitle: {
-    color: '#0f172a',
+    color: '#102a19',
     flex: 1,
     fontSize: 18,
     fontWeight: '700',
@@ -487,7 +588,7 @@ const styles = StyleSheet.create({
     borderColor: '#e2e8f0',
     borderRadius: 12,
     borderWidth: 1,
-    color: '#0f172a',
+    color: '#102a19',
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
@@ -503,10 +604,10 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   optionChipActive: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#16a34a',
   },
   optionChipText: {
-    color: '#334155',
+    color: '#2f5f3b',
     fontSize: 12,
     fontWeight: '700',
     textTransform: 'capitalize',
@@ -519,8 +620,13 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
   },
+  addTargetRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
   goalActionPrimary: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#16a34a',
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -537,7 +643,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   goalActionSecondaryText: {
-    color: '#0f172a',
+    color: '#102a19',
     fontSize: 13,
     fontWeight: '700',
   },
@@ -560,6 +666,62 @@ const styles = StyleSheet.create({
   goalHint: {
     color: '#64748b',
     fontSize: 12,
+  },
+  copyRow: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 14,
+    gap: 8,
+    padding: 12,
+  },
+  copyLabel: {
+    color: '#64748b',
+    fontSize: 12,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  copyTargets: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  targetBlock: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 14,
+    gap: 8,
+    padding: 12,
+  },
+  targetSelector: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  targetChip: {
+    backgroundColor: '#e2e8f0',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  targetChipActive: {
+    backgroundColor: '#102a19',
+  },
+  targetChipText: {
+    color: '#2f5f3b',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  targetChipTextActive: {
+    color: '#ffffff',
+  },
+  copyChip: {
+    backgroundColor: '#dcfce7',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  copyChipText: {
+    color: '#166534',
+    fontSize: 12,
+    fontWeight: '800',
   },
   buttonPressed: {
     opacity: 0.88,

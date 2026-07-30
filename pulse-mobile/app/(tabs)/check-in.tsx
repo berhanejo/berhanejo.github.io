@@ -1,168 +1,61 @@
-import { useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import * as ImagePicker from 'expo-image-picker';
 import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { Celebration } from '@/components/celebration';
 import { ScreenContainer } from '@/components/screen-container';
-import { useAppSession } from '@/contexts/app-session';
-import { checkInByCategory } from '@/data/mock-data';
+import { CATEGORY_COLORS } from '@/constants/category-colors';
+import { useCheckInFlow } from '@/lib/check-in/use-check-in-flow';
 
 export default function CheckInScreen() {
-  const params = useLocalSearchParams<{ goalId?: string }>();
   const {
     currentUser,
     activePrograms,
+    publishTargets,
+    selectedPublishTarget,
+    selectedPublishTargetId,
     ownActiveGoalStatuses,
-    ownGoalLatestCheckIns,
-    currentProgram,
-    todayCheckIn,
-    setPrimaryProgram,
-    submitTodayCheckIn,
-  } =
-    useAppSession();
-  const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
-  const [caption, setCaption] = useState('');
-  const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
-  const requiresGoalSelection = activePrograms.length > 1;
-  const selectedGoal =
-    activePrograms.find((program) => program.id === selectedGoalId) ??
-    (requiresGoalSelection ? null : activePrograms[0] ?? null);
-  const displayProgram = selectedGoal ?? currentProgram;
-  const selectedGoalStatus =
-    ownActiveGoalStatuses.find((item) => item.goalId === selectedGoal?.id) ??
-    ownActiveGoalStatuses.find((item) => item.goalId === currentProgram.id) ??
-    null;
-  const selectedGoalLatest =
-    ownGoalLatestCheckIns.find((item) => item.goalId === selectedGoal?.id) ??
-    ownGoalLatestCheckIns.find((item) => item.goalId === currentProgram.id) ??
-    null;
-  const hasCheckedInToday = selectedGoalStatus?.status === 'done';
-  const latestCheckInCaption = selectedGoalLatest?.caption ?? null;
-  const latestCheckInImageUri = selectedGoalLatest?.imageUri ?? null;
-  const latestCheckInDate = selectedGoalLatest?.date ?? null;
-  const displayCheckIn = selectedGoal ? todayCheckIn : checkInByCategory[displayProgram.category];
-  const canSubmit = Boolean(selectedGoal && caption.trim() && selectedImageUri);
-  const categoryContent = {
-    fitness: {
-      icon: 'directions-run' as const,
-      proofTitle: 'Show today’s movement proof',
-      proofDescription:
-        'Upload something that clearly shows you completed the session or movement goal.',
-      captionTitle: 'Session note',
-      captionHint: 'Add a short note about the session, effort, or what you completed.',
-    },
-    learning: {
-      icon: 'school' as const,
-      proofTitle: 'Show today’s learning proof',
-      proofDescription:
-        'Upload something that clearly shows you completed the study block or lesson.',
-      captionTitle: 'Learning note',
-      captionHint: 'Add a short note about what you learned, finished, or reviewed.',
-    },
-    reading: {
-      icon: 'menu-book' as const,
-      proofTitle: 'Show today’s reading proof',
-      proofDescription:
-        'Upload something that clearly shows your reading progress or reflection.',
-      captionTitle: 'Reading note',
-      captionHint: 'Add a short note about the chapter, page range, or one idea that stood out.',
-    },
-    mindset: {
-      icon: 'self-improvement' as const,
-      proofTitle: 'Show today’s reset proof',
-      proofDescription:
-        'Upload something that clearly shows you completed the reset, reflection, or journal step.',
-      captionTitle: 'Reflection note',
-      captionHint: 'Add a short note about your reset, reflection, or how you showed up today.',
-    },
-  }[displayProgram.category];
+    selectedGoal,
+    displayProgram,
+    displayCheckIn,
+    categoryContent,
+    requiresGoalSelection,
+    hasCheckedInToday,
+    latestCheckInCaption,
+    latestCheckInId,
+    latestCheckInImageUri,
+    latestCheckInDate,
+    caption,
+    editCaption,
+    selectedImageUri,
+    isSubmitting,
+    submitError,
+    canSubmit,
+    setCaption,
+    setEditCaption,
+    setSelectedPublishTargetId,
+    handleSelectGoal,
+    handleTakePhoto,
+    handlePickImage,
+    handleSubmit,
+    handleUpdateLatestCheckIn,
+    handleDeleteLatestCheckIn,
+  } = useCheckInFlow();
 
-  useEffect(() => {
-    const goalIdFromParams = typeof params.goalId === 'string' ? params.goalId : null;
-    if (!goalIdFromParams) {
-      return;
-    }
-
-    const match = activePrograms.find((program) => program.id === goalIdFromParams);
-    if (!match) {
-      return;
-    }
-
-    setSelectedGoalId(match.id);
-  }, [activePrograms, params.goalId]);
-
-  useEffect(() => {
-    const goalIdFromParams = typeof params.goalId === 'string' ? params.goalId : null;
-    if (goalIdFromParams && activePrograms.some((program) => program.id === goalIdFromParams)) {
-      return;
-    }
-
-    if (activePrograms.length === 0) {
-      setSelectedGoalId(null);
-      return;
-    }
-
-    if (activePrograms.length === 1) {
-      const onlyGoalId = activePrograms[0].id;
-      setSelectedGoalId(onlyGoalId);
-      if (currentProgram.id !== onlyGoalId) {
-        setPrimaryProgram(onlyGoalId);
-      }
-      return;
-    }
-
-    setSelectedGoalId((prev) => (prev && activePrograms.some((program) => program.id === prev) ? prev : null));
-  }, [activePrograms, currentProgram.id, params.goalId, setPrimaryProgram]);
-
-  useEffect(() => {
-    if (!hasCheckedInToday) {
-      return;
-    }
-
-    setCaption('');
-    setSelectedImageUri(null);
-  }, [hasCheckedInToday]);
-
-  useEffect(() => {
-    setCaption('');
-    setSelectedImageUri(null);
-  }, [selectedGoalId]);
-
-  function handleSelectGoal(goalId: string) {
-    setSelectedGoalId(goalId);
+  if (!displayProgram || !categoryContent || !displayCheckIn) {
+    return (
+      <ScreenContainer>
+        <View style={styles.header}>
+          <Text style={styles.kicker}>Check-in</Text>
+          <Text style={styles.title}>No active goals yet</Text>
+          <Text style={styles.subtitle}>
+            Add a goal from Goal Management to unlock your first check-in.
+          </Text>
+        </View>
+      </ScreenContainer>
+    );
   }
 
-  async function handlePickImage() {
-    if (hasCheckedInToday || !selectedGoal) {
-      return;
-    }
-
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      quality: 0.8,
-    });
-
-    if (result.canceled || !result.assets.length) {
-      return;
-    }
-
-    setSelectedImageUri(result.assets[0].uri);
-  }
-
-  async function handleSubmit() {
-    if (!selectedGoal || !selectedImageUri || !caption.trim()) {
-      return;
-    }
-
-    submitTodayCheckIn(selectedGoal.id, caption, selectedImageUri);
-  }
+  const categoryColor = CATEGORY_COLORS[displayProgram.category];
 
   return (
     <ScreenContainer>
@@ -205,7 +98,7 @@ export default function CheckInScreen() {
                       {isSelected ? (
                         <View style={styles.goalChipSelectedBadge}>
                           <View style={styles.goalChipCheckWrap}>
-                            <MaterialIcons name="check" size={12} color="#2563eb" />
+                            <MaterialIcons name="check" size={12} color="#16a34a" />
                           </View>
                           <Text style={styles.goalChipSelectedBadgeText}>Selected</Text>
                         </View>
@@ -249,16 +142,57 @@ export default function CheckInScreen() {
           <View style={styles.contextMain}>
             <Text style={styles.cardLabel}>Today&apos;s task</Text>
             <Text style={styles.contextTitle}>
-              {selectedGoal ? todayCheckIn.prompt : 'Choose one goal above to unlock today’s check-in.'}
+              {selectedGoal ? displayCheckIn.prompt : 'Choose one goal above to unlock today’s check-in.'}
             </Text>
             <Text style={styles.contextHint}>
-              {selectedGoal ? todayCheckIn.instructions : 'Each check-in is tied to exactly one goal/challenge.'}
+              {selectedGoal ? displayCheckIn.instructions : 'Each check-in is tied to exactly one goal/challenge.'}
             </Text>
           </View>
           <View style={[styles.statusBadge, selectedGoal && hasCheckedInToday && styles.statusBadgeDone]}>
             <Text style={[styles.statusBadgeText, selectedGoal && hasCheckedInToday && styles.statusBadgeTextDone]}>
-              {selectedGoal ? todayCheckIn.status : 'choose goal'}
+              {selectedGoal ? displayCheckIn.status : 'choose goal'}
             </Text>
+          </View>
+        </View>
+
+        <View style={styles.publishCard}>
+          <View style={styles.goalSelectorHeader}>
+            <Text style={styles.cardLabel}>Publish proof to</Text>
+            <Text style={styles.goalSelectorMeta}>
+              {selectedPublishTarget?.groupId ? 'Group visible' : 'Private'}
+            </Text>
+          </View>
+          <View style={styles.publishTargetList}>
+            {publishTargets.map((target) => {
+              const isSelected = selectedPublishTargetId === target.id;
+
+              return (
+                <Pressable
+                  key={target.id}
+                  disabled={!selectedGoal || hasCheckedInToday}
+                  onPress={() => setSelectedPublishTargetId(target.id)}
+                  style={({ pressed }) => [
+                    styles.publishTargetChip,
+                    isSelected && styles.publishTargetChipSelected,
+                    (!selectedGoal || hasCheckedInToday) && styles.publishTargetChipDisabled,
+                    pressed && selectedGoal && !hasCheckedInToday && styles.buttonPressed,
+                  ]}>
+                  <View style={styles.publishTargetTopRow}>
+                    <MaterialIcons
+                      name={target.groupId ? 'groups' : 'lock'}
+                      size={17}
+                      color={isSelected ? '#ffffff' : '#475569'}
+                    />
+                    <Text style={[styles.publishTargetTitle, isSelected && styles.publishTargetTitleSelected]}>
+                      {target.label}
+                    </Text>
+                  </View>
+                  <Text style={[styles.publishTargetHelper, isSelected && styles.publishTargetHelperSelected]}>
+                    {target.helper}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
         </View>
 
@@ -268,16 +202,9 @@ export default function CheckInScreen() {
             <Text style={styles.uploadMeta}>{displayProgram.categoryLabel}</Text>
           </View>
 
-          <Pressable
-            disabled={hasCheckedInToday || !selectedGoal}
-            onPress={handlePickImage}
-            style={({ pressed }) => [
-              styles.uploadArea,
-              (!selectedGoal || hasCheckedInToday) && styles.uploadAreaDisabled,
-              pressed && !hasCheckedInToday && selectedGoal && styles.pressedSurface,
-            ]}>
-            <View style={styles.uploadIconWrap}>
-              <MaterialIcons name={categoryContent.icon} size={26} color="#0f172a" />
+          <View style={[styles.uploadArea, (!selectedGoal || hasCheckedInToday) && styles.uploadAreaDisabled]}>
+            <View style={[styles.uploadIconWrap, { backgroundColor: categoryColor.background }]}>
+              <MaterialIcons name={categoryContent.icon} size={26} color={categoryColor.accent} />
             </View>
             <Text style={styles.uploadAreaTitle}>{categoryContent.proofTitle}</Text>
             <Text style={styles.uploadAreaText}>{categoryContent.proofDescription}</Text>
@@ -293,63 +220,118 @@ export default function CheckInScreen() {
                 </View>
               ))}
             </View>
-            <View style={styles.uploadButton}>
-              <Text style={styles.uploadButtonText}>
-                {hasCheckedInToday
-                  ? 'Uploaded today'
-                  : !selectedGoal
-                    ? 'Choose goal first'
-                    : selectedImageUri
-                      ? 'Change image'
-                      : 'Select image'}
-              </Text>
+
+            <View style={styles.photoActionRow}>
+              <Pressable
+                disabled={hasCheckedInToday || !selectedGoal}
+                onPress={handleTakePhoto}
+                style={({ pressed }) => [
+                  styles.photoActionButton,
+                  styles.photoActionButtonPrimary,
+                  pressed && !hasCheckedInToday && selectedGoal && styles.pressedSurface,
+                ]}>
+                <MaterialIcons name="photo-camera" size={18} color="#ffffff" />
+                <Text style={styles.photoActionButtonPrimaryText}>Take photo</Text>
+              </Pressable>
+              <Pressable
+                disabled={hasCheckedInToday || !selectedGoal}
+                onPress={handlePickImage}
+                style={({ pressed }) => [
+                  styles.photoActionButton,
+                  styles.photoActionButtonSecondary,
+                  pressed && !hasCheckedInToday && selectedGoal && styles.pressedSurface,
+                ]}>
+                <MaterialIcons name="photo-library" size={18} color="#102a19" />
+                <Text style={styles.photoActionButtonSecondaryText}>
+                  {selectedImageUri ? 'Change from library' : 'Choose from library'}
+                </Text>
+              </Pressable>
             </View>
-            <Text style={styles.uploadHint}>Stored locally only. No cloud upload yet.</Text>
-          </Pressable>
+            <Text style={styles.uploadHint}>
+              {hasCheckedInToday
+                ? 'Uploaded today.'
+                : !selectedGoal
+                  ? 'Choose a goal above first.'
+                  : selectedPublishTarget?.groupId
+                    ? `This proof will appear in ${selectedPublishTarget.label}.`
+                    : 'This proof stays private in your own progress.'}
+            </Text>
+          </View>
         </View>
 
         <View style={styles.captionCard}>
           <Text style={styles.uploadTitle}>{categoryContent.captionTitle}</Text>
           <Text style={styles.captionHint}>{categoryContent.captionHint}</Text>
           <TextInput
-            editable={!hasCheckedInToday && Boolean(selectedGoal)}
+            editable={Boolean(selectedGoal)}
             multiline
             placeholder={displayCheckIn.captionPlaceholder}
             placeholderTextColor="#94a3b8"
             style={styles.captionInput}
-            value={selectedGoal && hasCheckedInToday ? latestCheckInCaption ?? '' : caption}
-            onChangeText={setCaption}
+            value={selectedGoal && hasCheckedInToday ? editCaption : caption}
+            onChangeText={selectedGoal && hasCheckedInToday ? setEditCaption : setCaption}
           />
+          {hasCheckedInToday && latestCheckInId ? (
+            <View style={styles.editActionsRow}>
+              <Pressable
+                disabled={isSubmitting || !editCaption.trim() || editCaption === (latestCheckInCaption ?? '')}
+                onPress={handleUpdateLatestCheckIn}
+                style={({ pressed }) => [
+                  styles.editSaveButton,
+                  (isSubmitting || !editCaption.trim() || editCaption === (latestCheckInCaption ?? '')) && styles.primaryButtonDisabled,
+                  pressed && styles.buttonPressed,
+                ]}>
+                <Text style={styles.editSaveButtonText}>{isSubmitting ? 'Saving…' : 'Save edit'}</Text>
+              </Pressable>
+              <Pressable
+                disabled={isSubmitting}
+                onPress={handleDeleteLatestCheckIn}
+                style={({ pressed }) => [styles.editDeleteButton, pressed && styles.buttonPressed]}>
+                <Text style={styles.editDeleteButtonText}>Delete</Text>
+              </Pressable>
+            </View>
+          ) : null}
         </View>
 
         <Pressable
-          disabled={hasCheckedInToday || !canSubmit || !selectedGoal}
+          disabled={hasCheckedInToday || !canSubmit || !selectedGoal || isSubmitting}
           onPress={handleSubmit}
           style={({ pressed }) => [
             styles.primaryButton,
             hasCheckedInToday && styles.primaryButtonDone,
-            (!hasCheckedInToday && !canSubmit) || !selectedGoal ? styles.primaryButtonDisabled : null,
-            pressed && canSubmit && !hasCheckedInToday && selectedGoal && styles.buttonPressed,
+            (!hasCheckedInToday && !canSubmit) || !selectedGoal || isSubmitting ? styles.primaryButtonDisabled : null,
+            pressed && canSubmit && !hasCheckedInToday && selectedGoal && !isSubmitting && styles.buttonPressed,
           ]}>
           <Text style={styles.primaryButtonText}>
-            {hasCheckedInToday ? 'Checked in today' : displayCheckIn.ctaLabel}
+            {isSubmitting ? 'Posting…' : hasCheckedInToday ? 'Checked in today' : displayCheckIn.ctaLabel}
           </Text>
           <Text style={styles.primaryButtonHint}>
             {!selectedGoal
               ? 'Choose one active goal to continue'
               : hasCheckedInToday
               ? 'Done. Your status is updated for today.'
-              : canSubmit
-                ? 'Creates a local check-in for the selected goal'
-                : 'Select an image and add a caption to post today'}
+              : isSubmitting
+                ? 'Uploading your photo and saving the check-in…'
+                : canSubmit
+                  ? selectedPublishTarget?.groupId
+                    ? `Shares this check-in with ${selectedPublishTarget.label}`
+                    : 'Saves this check-in privately'
+                  : 'Select an image and add a caption to post today'}
           </Text>
         </Pressable>
 
+        {submitError ? <Text style={styles.errorText}>{submitError}</Text> : null}
+
         {selectedGoal && hasCheckedInToday ? (
-          <View style={styles.successCard}>
-            <MaterialIcons name="check-circle" size={18} color="#15803d" />
-            <Text style={styles.successText}>Check-in submitted. You are marked as done for today.</Text>
-          </View>
+          <Celebration>
+            <View style={styles.successCard}>
+              <MaterialIcons name="celebration" size={22} color="#15803d" />
+              <View style={styles.successTextWrap}>
+                <Text style={styles.successTitle}>Nice work — day complete!</Text>
+                <Text style={styles.successText}>Your proof is posted and you&apos;re marked done for today.</Text>
+              </View>
+            </View>
+          </Celebration>
         ) : null}
 
         {selectedGoal && (latestCheckInCaption || latestCheckInImageUri) ? (
@@ -375,7 +357,9 @@ export default function CheckInScreen() {
         <View style={styles.noteCard}>
           <MaterialIcons name="lock" size={18} color="#475569" />
           <Text style={styles.noteText}>
-            Your check-in is shared only with your private group, not publicly.
+            {selectedPublishTarget?.groupId
+              ? `Your check-in appears only in ${selectedPublishTarget.label}, not publicly.`
+              : 'Your check-in stays private and does not appear in a group feed.'}
           </Text>
         </View>
       </View>
@@ -400,7 +384,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   title: {
-    color: '#0f172a',
+    color: '#102a19',
     fontSize: 30,
     fontWeight: '700',
     letterSpacing: -0.8,
@@ -416,7 +400,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     gap: 12,
     padding: 18,
-    shadowColor: '#0f172a',
+    shadowColor: '#102a19',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.04,
     shadowRadius: 16,
@@ -447,8 +431,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   goalChipSelected: {
-    backgroundColor: '#eff6ff',
-    borderColor: '#2563eb',
+    backgroundColor: '#f0fdf4',
+    borderColor: '#16a34a',
     borderWidth: 2,
   },
   goalChipTopRow: {
@@ -465,7 +449,7 @@ const styles = StyleSheet.create({
   goalChipCheckWrap: {
     alignItems: 'center',
     backgroundColor: '#ffffff',
-    borderColor: '#93c5fd',
+    borderColor: '#86efac',
     borderRadius: 999,
     borderWidth: 1,
     height: 18,
@@ -473,18 +457,18 @@ const styles = StyleSheet.create({
     width: 18,
   },
   goalChipSelectedBadgeText: {
-    color: '#1d4ed8',
+    color: '#15803d',
     fontSize: 11,
     fontWeight: '700',
     textTransform: 'uppercase',
   },
   goalChipTitle: {
-    color: '#0f172a',
+    color: '#102a19',
     fontSize: 15,
     fontWeight: '700',
   },
   goalChipTitleSelected: {
-    color: '#1e40af',
+    color: '#166534',
   },
   goalChipMeta: {
     color: '#64748b',
@@ -492,7 +476,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   goalChipMetaSelected: {
-    color: '#1e40af',
+    color: '#166534',
     fontWeight: '700',
   },
   goalChipStatusBadge: {
@@ -531,7 +515,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   goalRequiredText: {
-    color: '#1d4ed8',
+    color: '#15803d',
     fontSize: 13,
     fontWeight: '700',
   },
@@ -593,13 +577,65 @@ const styles = StyleSheet.create({
   statusBadgeTextDone: {
     color: '#166534',
   },
+  publishCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    gap: 12,
+    padding: 18,
+    shadowColor: '#102a19',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.04,
+    shadowRadius: 16,
+    elevation: 1,
+  },
+  publishTargetList: {
+    gap: 8,
+  },
+  publishTargetChip: {
+    backgroundColor: '#f8fafc',
+    borderColor: '#cbd5e1',
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  publishTargetChipSelected: {
+    backgroundColor: '#102a19',
+    borderColor: '#102a19',
+  },
+  publishTargetChipDisabled: {
+    opacity: 0.65,
+  },
+  publishTargetTopRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  publishTargetTitle: {
+    color: '#102a19',
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  publishTargetTitleSelected: {
+    color: '#ffffff',
+  },
+  publishTargetHelper: {
+    color: '#64748b',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  publishTargetHelperSelected: {
+    color: '#cbd5e1',
+  },
   uploadCard: {
     backgroundColor: '#ffffff',
     borderRadius: 24,
     padding: 20,
     gap: 16,
     width: '100%',
-    shadowColor: '#0f172a',
+    shadowColor: '#102a19',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.05,
     shadowRadius: 18,
@@ -612,7 +648,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   uploadTitle: {
-    color: '#0f172a',
+    color: '#102a19',
     fontSize: 18,
     fontWeight: '600',
     flex: 1,
@@ -658,7 +694,7 @@ const styles = StyleSheet.create({
     width: 56,
   },
   uploadAreaTitle: {
-    color: '#0f172a',
+    color: '#102a19',
     fontSize: 22,
     fontWeight: '700',
     letterSpacing: -0.3,
@@ -688,20 +724,40 @@ const styles = StyleSheet.create({
     maxWidth: '100%',
   },
   exampleChipText: {
-    color: '#334155',
+    color: '#2f5f3b',
     fontSize: 12,
     fontWeight: '600',
     flexShrink: 1,
   },
-  uploadButton: {
-    backgroundColor: '#0f172a',
+  photoActionRow: {
+    flexDirection: 'row',
+    gap: 10,
+    width: '100%',
+  },
+  photoActionButton: {
+    alignItems: 'center',
     borderRadius: 14,
-    paddingHorizontal: 18,
+    flex: 1,
+    flexDirection: 'row',
+    gap: 6,
+    justifyContent: 'center',
+    paddingHorizontal: 12,
     paddingVertical: 12,
   },
-  uploadButtonText: {
+  photoActionButtonPrimary: {
+    backgroundColor: '#102a19',
+  },
+  photoActionButtonPrimaryText: {
     color: '#ffffff',
-    fontSize: 14,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  photoActionButtonSecondary: {
+    backgroundColor: '#e2e8f0',
+  },
+  photoActionButtonSecondaryText: {
+    color: '#102a19',
+    fontSize: 13,
     fontWeight: '700',
   },
   uploadHint: {
@@ -715,7 +771,7 @@ const styles = StyleSheet.create({
     padding: 20,
     gap: 12,
     width: '100%',
-    shadowColor: '#0f172a',
+    shadowColor: '#102a19',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.04,
     shadowRadius: 16,
@@ -732,15 +788,46 @@ const styles = StyleSheet.create({
     borderColor: '#e2e8f0',
     borderRadius: 18,
     borderWidth: 1,
-    color: '#0f172a',
+    color: '#102a19',
     minHeight: 120,
     paddingHorizontal: 16,
     paddingTop: 16,
     textAlignVertical: 'top',
     width: '100%',
   },
+  editActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  editSaveButton: {
+    alignItems: 'center',
+    backgroundColor: '#16a34a',
+    borderRadius: 14,
+    flex: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  editSaveButtonText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  editDeleteButton: {
+    alignItems: 'center',
+    backgroundColor: '#fee2e2',
+    borderColor: '#fecaca',
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  editDeleteButtonText: {
+    color: '#991b1b',
+    fontSize: 13,
+    fontWeight: '800',
+  },
   primaryButton: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#16a34a',
     borderRadius: 22,
     paddingHorizontal: 20,
     paddingVertical: 18,
@@ -762,9 +849,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   primaryButtonHint: {
-    color: '#dbeafe',
+    color: '#dcfce7',
     fontSize: 13,
     marginTop: 4,
+    textAlign: 'center',
+  },
+  errorText: {
+    color: '#dc2626',
+    fontSize: 13,
+    fontWeight: '600',
+    paddingHorizontal: 4,
     textAlign: 'center',
   },
   successCard: {
@@ -772,14 +866,22 @@ const styles = StyleSheet.create({
     backgroundColor: '#dcfce7',
     borderRadius: 18,
     flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     width: '100%',
+  },
+  successTextWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  successTitle: {
+    color: '#14532d',
+    fontSize: 15,
+    fontWeight: '700',
   },
   successText: {
     color: '#166534',
-    flex: 1,
     fontSize: 13,
     fontWeight: '600',
     lineHeight: 18,
@@ -797,12 +899,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   emptyTitle: {
-    color: '#0f172a',
+    color: '#102a19',
     fontSize: 17,
     fontWeight: '700',
   },
   latestText: {
-    color: '#0f172a',
+    color: '#102a19',
     fontSize: 14,
     lineHeight: 20,
   },

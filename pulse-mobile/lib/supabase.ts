@@ -16,7 +16,10 @@ const authOptions =
     ? {
         autoRefreshToken: true,
         persistSession: true,
-        detectSessionInUrl: false,
+        // Needed so a password-reset (or email-confirmation) link's
+        // #access_token=...&type=recovery URL fragment is picked up
+        // automatically when it lands back on the web app.
+        detectSessionInUrl: true,
       }
     : {
         autoRefreshToken: true,

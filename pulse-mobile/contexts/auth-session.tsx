@@ -1,5 +1,6 @@
 import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
+import * as Linking from 'expo-linking';
 
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 
@@ -7,9 +8,12 @@ type AuthSessionContextValue = {
   session: Session | null;
   user: User | null;
   isLoading: boolean;
+  isPasswordRecovery: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string, displayName: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<{ error: string | null }>;
+  updatePassword: (newPassword: string) => Promise<{ error: string | null }>;
 };
 
 const AuthSessionContext = createContext<AuthSessionContextValue | null>(null);
@@ -17,6 +21,7 @@ const AuthSessionContext = createContext<AuthSessionContextValue | null>(null);
 export function AuthSessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
@@ -61,9 +66,12 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
         setIsLoading(false);
       });
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (__DEV__) {
-        console.log('[auth] state change:', _event, Boolean(nextSession));
+        console.log('[auth] state change:', event, Boolean(nextSession));
+      }
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsPasswordRecovery(true);
       }
       setSession(nextSession ?? null);
       setIsLoading(false);
@@ -121,29 +129,21 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
           console.log('[auth] signUp attempt for:', cleanedEmail);
         }
 
+        // display_name travels in the user metadata so the on_auth_user_created
+        // DB trigger can pick it up when it creates the profiles row — this
+        // happens server-side at signup regardless of whether a client
+        // session exists yet (e.g. email confirmation pending), unlike a
+        // client-side upsert which can silently never run.
         const { error } = await supabase.auth.signUp({
           email: cleanedEmail,
           password,
+          options: {
+            data: { display_name: displayName.trim() || null },
+          },
         });
 
         if (__DEV__) {
           console.log('[auth] signUp result error:', error?.message ?? 'none');
-        }
-
-        if (!error) {
-          const { data: sessionData } = await supabase.auth.getSession();
-          const userId = sessionData.session?.user?.id;
-
-          if (userId) {
-            const { error: profileError } = await supabase.from('profiles').upsert({
-              id: userId,
-              display_name: displayName.trim() || null,
-            });
-
-            if (profileError && __DEV__) {
-              console.warn('[auth] profile upsert error:', profileError.message);
-            }
-          }
         }
 
         return { error: error?.message ?? null };
@@ -163,8 +163,34 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
         setSession(null);
         setIsLoading(false);
       },
+      requestPasswordReset: async (email: string) => {
+        if (!isSupabaseConfigured) {
+          return { error: 'Supabase is not configured.' };
+        }
+
+        const cleanedEmail = email.trim().toLowerCase();
+        const { error } = await supabase.auth.resetPasswordForEmail(cleanedEmail, {
+          redirectTo: Linking.createURL('/auth/reset-password'),
+        });
+
+        return { error: error?.message ?? null };
+      },
+      updatePassword: async (newPassword: string) => {
+        if (!isSupabaseConfigured) {
+          return { error: 'Supabase is not configured.' };
+        }
+
+        const { error } = await supabase.auth.updateUser({ password: newPassword });
+
+        if (!error) {
+          setIsPasswordRecovery(false);
+        }
+
+        return { error: error?.message ?? null };
+      },
+      isPasswordRecovery,
     }),
-    [isLoading, session]
+    [isLoading, isPasswordRecovery, session]
   );
 
   return <AuthSessionContext.Provider value={value}>{children}</AuthSessionContext.Provider>;

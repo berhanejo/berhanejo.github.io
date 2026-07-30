@@ -4,9 +4,11 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { CheckInTabButton } from '@/components/check-in-tab-button';
 import { HapticTab } from '@/components/haptic-tab';
-import { useAppSession } from '@/contexts/app-session';
+import { colors, shadows } from '@/constants/tokens';
 import { useAuthSession } from '@/contexts/auth-session';
+import { useProfile } from '@/lib/queries/profile';
 
 const tabBarLabelStyle = {
   fontSize: 12,
@@ -25,10 +27,6 @@ function GroupIcon({ color, size }: { color: string; size: number }) {
   return <MaterialIcons name="groups" size={size} color={color} />;
 }
 
-function CheckInIcon({ color, size }: { color: string; size: number }) {
-  return <MaterialIcons name="add-circle" size={size} color={color} />;
-}
-
 function ProgressIcon({ color, size }: { color: string; size: number }) {
   return <MaterialIcons name="show-chart" size={size} color={color} />;
 }
@@ -38,15 +36,15 @@ function ProfileIcon({ color, size }: { color: string; size: number }) {
 }
 
 export default function TabLayout() {
-  const { session, isLoading } = useAuthSession();
-  const { hasCompletedOnboarding } = useAppSession();
+  const { session, isLoading, isPasswordRecovery } = useAuthSession();
+  const { data: profile, isLoading: isProfileLoading } = useProfile();
   const insets = useSafeAreaInsets();
   const bottomInset = Platform.OS === 'android' ? Math.max(insets.bottom, 12) : insets.bottom;
   const tabBarHeight = 60 + bottomInset;
   const screenOptions = useMemo(
     () => ({
-      tabBarActiveTintColor: '#2563eb',
-      tabBarInactiveTintColor: '#64748b',
+      tabBarActiveTintColor: colors.primary.text,
+      tabBarInactiveTintColor: colors.slate[500],
       headerShown: false,
       tabBarButton: HapticTab,
       tabBarLabelStyle,
@@ -55,28 +53,33 @@ export default function TabLayout() {
         height: tabBarHeight,
         paddingBottom: bottomInset,
         paddingTop: 8,
-        backgroundColor: '#ffffff',
-        borderTopColor: '#e5e7eb',
+        backgroundColor: colors.surface,
+        borderTopColor: colors.border,
         borderTopWidth: 1,
+        ...shadows.card,
       },
     }),
     [bottomInset, tabBarHeight]
   );
 
-  if (isLoading) {
+  if (isLoading || (session && isProfileLoading)) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator color="#2563eb" />
+        <ActivityIndicator color={colors.primary.text} />
         <Text style={styles.loadingText}>Loading Pulse…</Text>
       </View>
     );
+  }
+
+  if (isPasswordRecovery) {
+    return <Redirect href="/auth/reset-password" />;
   }
 
   if (!session) {
     return <Redirect href="/auth" />;
   }
 
-  if (!hasCompletedOnboarding) {
+  if (!profile?.onboardingCompleted) {
     return <Redirect href="/onboarding/welcome" />;
   }
 
@@ -100,7 +103,8 @@ export default function TabLayout() {
         name="check-in"
         options={{
           title: 'Check-in',
-          tabBarIcon: CheckInIcon,
+          tabBarButton: CheckInTabButton,
+          tabBarLabel: () => null,
         }}
       />
       <Tabs.Screen
@@ -130,13 +134,13 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   loading: {
     alignItems: 'center',
-    backgroundColor: '#f7f7fb',
+    backgroundColor: colors.background,
     flex: 1,
     gap: 12,
     justifyContent: 'center',
   },
   loadingText: {
-    color: '#64748b',
+    color: colors.slate[500],
     fontSize: 14,
     fontWeight: '600',
   },

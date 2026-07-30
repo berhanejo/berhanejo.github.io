@@ -2,6 +2,8 @@ import { memo, ReactNode } from 'react';
 import { FlatList, FlatListProps, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { colors, spacing } from '@/constants/tokens';
+
 type ScreenContainerProps = {
   children: ReactNode;
   compactTop?: boolean;
@@ -76,15 +78,15 @@ export function ScreenList<ItemT>({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#f7f7fb',
+    backgroundColor: colors.background,
   },
   content: {
     flexGrow: 1,
   },
   inner: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    gap: 16,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.lg,
+    gap: spacing.lg,
   },
   innerCompactTop: {
     paddingTop: 8,
