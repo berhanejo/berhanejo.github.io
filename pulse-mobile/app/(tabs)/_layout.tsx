@@ -46,21 +46,40 @@ function getTabIcon(routeName: string, color: string) {
   }
 }
 
+function getTabLabel(routeName: string) {
+  switch (routeName) {
+    case 'index':
+      return 'Home';
+    case 'group':
+      return 'Group';
+    case 'check-in':
+      return 'Post';
+    case 'progress':
+      return 'Progress';
+    case 'profile':
+      return 'Profile';
+    default:
+      return '';
+  }
+}
+
 function PulseTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
-  const isWeb = Platform.OS === 'web';
   const bottomInset =
-    Platform.OS === 'android' ? Math.max(insets.bottom + 8, 14) : Math.max(insets.bottom + 6, 14);
+    Platform.OS === 'web'
+      ? 'env(safe-area-inset-bottom)'
+      : Platform.OS === 'android'
+        ? insets.bottom
+        : insets.bottom;
+  const tabBarHeight = Platform.OS === 'web' ? styles.tabBarWebHeight : styles.tabBarNativeHeight;
+  const tabBarPosition =
+    Platform.OS === 'web'
+      ? styles.tabBarWebPosition
+      : ({ paddingBottom: bottomInset } as ViewStyle);
 
   return (
-    <View
-      pointerEvents="box-none"
-      style={[styles.tabBarWrap, isWeb ? styles.tabBarWrapTop : styles.tabBarWrapBottom]}>
-      <View
-        style={[
-          styles.tabBar,
-          isWeb ? styles.tabBarWebPosition : { bottom: bottomInset },
-        ]}>
+    <View pointerEvents="box-none" style={styles.tabBarWrap}>
+      <View style={[styles.tabBar, tabBarHeight, tabBarPosition]}>
         {state.routes.map((route, index) => {
           if (route.name === 'goals') {
             return null;
@@ -95,6 +114,11 @@ function PulseTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
                 pressed && styles.tabButtonPressed,
               ]}>
               {getTabIcon(route.name, color)}
+              <Text
+                numberOfLines={1}
+                style={[styles.tabButtonLabel, isFocused && styles.tabButtonLabelActive]}>
+                {getTabLabel(route.name)}
+              </Text>
             </Pressable>
           );
         })}
@@ -185,52 +209,67 @@ const styles = StyleSheet.create({
   },
   tabBar: {
     alignItems: 'center',
-    backgroundColor: 'rgba(15, 23, 42, 0.92)',
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    borderRadius: 999,
+    backgroundColor: 'rgba(15, 23, 42, 0.96)',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
     borderWidth: 1,
+    borderBottomWidth: 0,
     elevation: 8,
     flexDirection: 'row',
-    gap: 3,
-    height: 36,
+    gap: 0,
     justifyContent: 'center',
-    maxWidth: 246,
-    paddingHorizontal: 4,
+    left: 0,
+    paddingHorizontal: 8,
+    paddingTop: 8,
     position: 'absolute',
+    right: 0,
     shadowColor: colors.ink,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.16,
     shadowRadius: 14,
-    width: '68%',
+    width: '100%',
+  },
+  tabBarNativeHeight: {
+    minHeight: 68,
+  },
+  tabBarWebHeight: {
+    minHeight: 72,
   },
   tabBarWrap: {
     alignItems: 'center',
     backgroundColor: 'transparent',
-    height: 0,
+    bottom: 0,
     justifyContent: 'center',
     left: 0,
     pointerEvents: 'box-none',
     position: 'absolute',
     right: 0,
   },
-  tabBarWrapBottom: {
-    bottom: 0,
-  },
-  tabBarWrapTop: {
-    top: 0,
-  },
   tabBarWebPosition: {
-    top: 'calc(8px + env(safe-area-inset-top))',
+    bottom: 0,
+    paddingBottom: 'max(10px, env(safe-area-inset-bottom))',
   } as unknown as ViewStyle,
   tabButton: {
     alignItems: 'center',
-    borderRadius: 999,
-    height: 28,
+    borderRadius: 14,
+    flex: 1,
+    gap: 2,
+    height: 50,
     justifyContent: 'center',
-    width: 40,
+    minWidth: 0,
   },
   tabButtonActive: {
-    backgroundColor: colors.primary.light,
+    backgroundColor: 'rgba(134, 239, 172, 0.18)',
+  },
+  tabButtonLabel: {
+    color: colors.slate[300],
+    fontSize: 10,
+    fontWeight: '800',
+    lineHeight: 12,
+  },
+  tabButtonLabelActive: {
+    color: colors.primary.light,
   },
   tabButtonPressed: {
     opacity: 0.72,

@@ -85,14 +85,14 @@ const styles = StyleSheet.create({
   },
   inner: {
     paddingHorizontal: spacing.xl,
-    paddingTop: Platform.OS === 'web' ? 64 : spacing.lg,
-    paddingBottom: Platform.OS === 'web' ? 32 : 82,
+    paddingTop: spacing.lg,
+    paddingBottom: Platform.OS === 'web' ? 104 : 92,
     gap: spacing.lg,
   },
   innerCompactTop: {
     paddingTop: 8,
   },
   innerComfortableBottom: {
-    paddingBottom: Platform.OS === 'web' ? 44 : 94,
+    paddingBottom: Platform.OS === 'web' ? 116 : 104,
   },
 });

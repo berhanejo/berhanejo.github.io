@@ -416,7 +416,7 @@ test('app session view model preserves the main dashboard and group feed shape',
   assert.equal(viewModel.historyItems[0].caption, 'Today done, edited');
 });
 
-test('web tab navigation avoids phone bottom bars and clipped labels', () => {
+test('web tab navigation is bottom, full-width, labeled, and safe-area aware', () => {
   const tabLayoutSource = fs.readFileSync(path.join(projectRoot, 'app/(tabs)/_layout.tsx'), 'utf8');
   const screenContainerSource = fs.readFileSync(
     path.join(projectRoot, 'components/screen-container.tsx'),
@@ -425,19 +425,18 @@ test('web tab navigation avoids phone bottom bars and clipped labels', () => {
   const postExportSource = fs.readFileSync(path.join(projectRoot, 'scripts/post-export-web.js'), 'utf8');
 
   assert.ok(
-    tabLayoutSource.includes("top: 'calc(8px + env(safe-area-inset-top))'"),
-    'web tab bar should use the top safe area instead of the phone bottom edge'
+    tabLayoutSource.includes("paddingBottom: 'max(10px, env(safe-area-inset-bottom))'"),
+    'web tab bar should reserve bottom safe-area space'
   );
+  assert.ok(tabLayoutSource.includes('bottom: 0'), 'web tab bar should sit at the bottom edge');
+  assert.ok(tabLayoutSource.includes("width: '100%'"), 'tab bar should span the full screen width');
   assert.ok(
-    tabLayoutSource.includes('isWeb ? styles.tabBarWrapTop : styles.tabBarWrapBottom'),
-    'web and native tab positions should be separated'
+    tabLayoutSource.includes('getTabLabel(route.name)'),
+    'custom app tab bar should render text labels'
   );
-  assert.ok(
-    !tabLayoutSource.includes('tabBarLabel') && !tabLayoutSource.includes('tabBarShowLabel'),
-    'custom app tab bar should not render text labels that can be clipped'
-  );
-  assert.ok(tabLayoutSource.includes('height: 36'), 'tab bar should stay compact on small screens');
-  assert.ok(screenContainerSource.includes("Platform.OS === 'web' ? 64"), 'web screens need top nav clearance');
+  assert.ok(tabLayoutSource.includes('numberOfLines={1}'), 'tab labels should be constrained to one line');
+  assert.ok(tabLayoutSource.includes('lineHeight: 12'), 'tab label line height should prevent clipping');
+  assert.ok(screenContainerSource.includes("Platform.OS === 'web' ? 104"), 'web screens need bottom nav clearance');
   assert.ok(postExportSource.includes('100dvh'), 'web export should account for mobile browser viewport height');
   assert.ok(
     postExportSource.includes('viewport-fit=cover'),
