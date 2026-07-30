@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const Module = require('node:module');
 const path = require('node:path');
 const ts = require('typescript');
@@ -413,6 +414,35 @@ test('app session view model preserves the main dashboard and group feed shape',
   assert.equal(viewModel.groupActivityFeed[0].imageUri, 'https://example.test/user-check-3.jpg');
   assert.equal(viewModel.historyItems[0].type, 'updated');
   assert.equal(viewModel.historyItems[0].caption, 'Today done, edited');
+});
+
+test('web tab navigation avoids phone bottom bars and clipped labels', () => {
+  const tabLayoutSource = fs.readFileSync(path.join(projectRoot, 'app/(tabs)/_layout.tsx'), 'utf8');
+  const screenContainerSource = fs.readFileSync(
+    path.join(projectRoot, 'components/screen-container.tsx'),
+    'utf8'
+  );
+  const postExportSource = fs.readFileSync(path.join(projectRoot, 'scripts/post-export-web.js'), 'utf8');
+
+  assert.ok(
+    tabLayoutSource.includes("top: 'calc(8px + env(safe-area-inset-top))'"),
+    'web tab bar should use the top safe area instead of the phone bottom edge'
+  );
+  assert.ok(
+    tabLayoutSource.includes('isWeb ? styles.tabBarWrapTop : styles.tabBarWrapBottom'),
+    'web and native tab positions should be separated'
+  );
+  assert.ok(
+    !tabLayoutSource.includes('tabBarLabel') && !tabLayoutSource.includes('tabBarShowLabel'),
+    'custom app tab bar should not render text labels that can be clipped'
+  );
+  assert.ok(tabLayoutSource.includes('height: 36'), 'tab bar should stay compact on small screens');
+  assert.ok(screenContainerSource.includes("Platform.OS === 'web' ? 64"), 'web screens need top nav clearance');
+  assert.ok(postExportSource.includes('100dvh'), 'web export should account for mobile browser viewport height');
+  assert.ok(
+    postExportSource.includes('viewport-fit=cover'),
+    'web export should preserve safe-area viewport support'
+  );
 });
 
 console.log('Smoke tests passed');

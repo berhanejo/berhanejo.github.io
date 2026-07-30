@@ -1,5 +1,5 @@
 import { memo, ReactNode } from 'react';
-import { FlatList, FlatListProps, ScrollView, StyleSheet, View } from 'react-native';
+import { FlatList, FlatListProps, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, spacing } from '@/constants/tokens';
@@ -85,14 +85,14 @@ const styles = StyleSheet.create({
   },
   inner: {
     paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
-    paddingBottom: 82,
+    paddingTop: Platform.OS === 'web' ? 64 : spacing.lg,
+    paddingBottom: Platform.OS === 'web' ? 32 : 82,
     gap: spacing.lg,
   },
   innerCompactTop: {
     paddingTop: 8,
   },
   innerComfortableBottom: {
-    paddingBottom: 94,
+    paddingBottom: Platform.OS === 'web' ? 44 : 94,
   },
 });

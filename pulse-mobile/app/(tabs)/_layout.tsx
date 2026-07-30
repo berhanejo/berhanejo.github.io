@@ -48,19 +48,18 @@ function getTabIcon(routeName: string, color: string) {
 
 function PulseTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const isWeb = Platform.OS === 'web';
   const bottomInset =
-    Platform.OS === 'web'
-      ? 12
-      : Platform.OS === 'android'
-        ? Math.max(insets.bottom + 8, 14)
-        : Math.max(insets.bottom + 6, 14);
+    Platform.OS === 'android' ? Math.max(insets.bottom + 8, 14) : Math.max(insets.bottom + 6, 14);
 
   return (
-    <View pointerEvents="box-none" style={styles.tabBarWrap}>
+    <View
+      pointerEvents="box-none"
+      style={[styles.tabBarWrap, isWeb ? styles.tabBarWrapTop : styles.tabBarWrapBottom]}>
       <View
         style={[
           styles.tabBar,
-          Platform.OS === 'web' ? styles.tabBarWebPosition : { bottom: bottomInset },
+          isWeb ? styles.tabBarWebPosition : { bottom: bottomInset },
         ]}>
         {state.routes.map((route, index) => {
           if (route.name === 'goals') {
@@ -213,10 +212,15 @@ const styles = StyleSheet.create({
     pointerEvents: 'box-none',
     position: 'absolute',
     right: 0,
+  },
+  tabBarWrapBottom: {
     bottom: 0,
   },
+  tabBarWrapTop: {
+    top: 0,
+  },
   tabBarWebPosition: {
-    bottom: 'calc(12px + env(safe-area-inset-bottom))',
+    top: 'calc(8px + env(safe-area-inset-top))',
   } as unknown as ViewStyle,
   tabButton: {
     alignItems: 'center',
