@@ -11,12 +11,17 @@ import { useAuthSession } from '@/contexts/auth-session';
 import { useProfile } from '@/lib/queries/profile';
 
 const tabBarLabelStyle = {
-  fontSize: 12,
-  fontWeight: '600',
+  fontSize: 11,
+  fontWeight: '800',
+  marginTop: 2,
+  paddingBottom: 0,
 } as const;
 
 const tabBarItemStyle = {
-  paddingVertical: 4,
+  height: 56,
+  justifyContent: 'center',
+  paddingBottom: 4,
+  paddingTop: 6,
 } as const;
 
 function HomeIcon({ color, size }: { color: string; size: number }) {
@@ -39,24 +44,29 @@ export default function TabLayout() {
   const { session, isLoading, isPasswordRecovery } = useAuthSession();
   const { data: profile, isLoading: isProfileLoading } = useProfile();
   const insets = useSafeAreaInsets();
-  const bottomInset = Platform.OS === 'android' ? Math.max(insets.bottom, 12) : insets.bottom;
-  const tabBarHeight = 60 + bottomInset;
+  const bottomInset = Platform.OS === 'web' ? 18 : Platform.OS === 'android' ? Math.max(insets.bottom, 14) : Math.max(insets.bottom, 8);
+  const tabBarHeight = 78 + bottomInset;
   const screenOptions = useMemo(
     () => ({
-      tabBarActiveTintColor: colors.primary.text,
-      tabBarInactiveTintColor: colors.slate[500],
+      tabBarActiveTintColor: colors.primary.light,
+      tabBarInactiveTintColor: colors.slate[300],
       headerShown: false,
       tabBarButton: HapticTab,
       tabBarLabelStyle,
       tabBarItemStyle,
       tabBarStyle: {
+        bottom: 0,
+        elevation: 12,
         height: tabBarHeight,
-        paddingBottom: bottomInset,
-        paddingTop: 8,
-        backgroundColor: colors.surface,
-        borderTopColor: colors.border,
+        paddingBottom: bottomInset + 6,
+        paddingTop: 10,
+        backgroundColor: colors.ink,
+        borderTopColor: 'rgba(255, 255, 255, 0.08)',
         borderTopWidth: 1,
-        ...shadows.card,
+        shadowColor: colors.ink,
+        shadowOffset: { width: 0, height: -8 },
+        shadowOpacity: 0.16,
+        shadowRadius: 18,
       },
     }),
     [bottomInset, tabBarHeight]

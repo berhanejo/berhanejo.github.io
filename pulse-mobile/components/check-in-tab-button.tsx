@@ -33,17 +33,18 @@ const styles = StyleSheet.create({
   wrapper: {
     alignItems: 'center',
     justifyContent: 'center',
-    top: -14,
+    height: 62,
+    top: -10,
   },
   button: {
     alignItems: 'center',
     backgroundColor: colors.primary.text,
-    borderColor: colors.surface,
+    borderColor: colors.ink,
     borderRadius: 999,
     borderWidth: 4,
-    height: 60,
+    height: 58,
     justifyContent: 'center',
-    width: 60,
+    width: 58,
     ...shadows.floating(colors.primary.text),
   },
 });
