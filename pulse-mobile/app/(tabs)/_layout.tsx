@@ -2,7 +2,7 @@ import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Redirect, Tabs } from 'expo-router';
 import React from 'react';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors } from '@/constants/tokens';
@@ -50,14 +50,18 @@ function PulseTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const bottomInset =
     Platform.OS === 'web'
-      ? 4
+      ? 12
       : Platform.OS === 'android'
-        ? Math.min(Math.max(insets.bottom, 4), 10)
-        : Math.min(Math.max(insets.bottom, 4), 12);
+        ? Math.max(insets.bottom + 8, 14)
+        : Math.max(insets.bottom + 6, 14);
 
   return (
-    <View style={[styles.tabBarWrap, { height: 34 + bottomInset, paddingBottom: bottomInset }]}>
-      <View style={styles.tabBar}>
+    <View pointerEvents="box-none" style={styles.tabBarWrap}>
+      <View
+        style={[
+          styles.tabBar,
+          Platform.OS === 'web' ? styles.tabBarWebPosition : { bottom: bottomInset },
+        ]}>
         {state.routes.map((route, index) => {
           if (route.name === 'goals') {
             return null;
@@ -65,7 +69,7 @@ function PulseTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 
           const { options } = descriptors[route.key];
           const isFocused = state.index === index;
-          const color = isFocused ? colors.ink : colors.slate[300];
+          const color = isFocused ? colors.ink : colors.slate[500];
 
           function handlePress() {
             const event = navigation.emit({
@@ -182,35 +186,44 @@ const styles = StyleSheet.create({
   },
   tabBar: {
     alignItems: 'center',
-    backgroundColor: colors.ink,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(15, 23, 42, 0.92)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
     borderRadius: 999,
     borderWidth: 1,
-    elevation: 3,
+    elevation: 8,
     flexDirection: 'row',
-    gap: 2,
-    height: 30,
+    gap: 3,
+    height: 36,
     justifyContent: 'center',
-    maxWidth: 214,
+    maxWidth: 246,
     paddingHorizontal: 4,
+    position: 'absolute',
     shadowColor: colors.ink,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    width: '62%',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.16,
+    shadowRadius: 14,
+    width: '68%',
   },
   tabBarWrap: {
     alignItems: 'center',
     backgroundColor: 'transparent',
-    justifyContent: 'flex-start',
-    paddingTop: 2,
+    height: 0,
+    justifyContent: 'center',
+    left: 0,
+    pointerEvents: 'box-none',
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
   },
+  tabBarWebPosition: {
+    bottom: 'calc(12px + env(safe-area-inset-bottom))',
+  } as unknown as ViewStyle,
   tabButton: {
     alignItems: 'center',
     borderRadius: 999,
-    height: 24,
+    height: 28,
     justifyContent: 'center',
-    width: 34,
+    width: 40,
   },
   tabButtonActive: {
     backgroundColor: colors.primary.light,

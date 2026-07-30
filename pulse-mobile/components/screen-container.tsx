@@ -85,13 +85,14 @@ const styles = StyleSheet.create({
   },
   inner: {
     paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: 82,
     gap: spacing.lg,
   },
   innerCompactTop: {
     paddingTop: 8,
   },
   innerComfortableBottom: {
-    paddingBottom: 24,
+    paddingBottom: 94,
   },
 });
